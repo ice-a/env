@@ -1,0 +1,634 @@
+root@ubuntu:~# vim install.sh
+root@ubuntu:~# chmod +x install.sh 
+root@ubuntu:~# ./install.sh 
+[INFO] ========== 开始自动安装稳定版 mambaconda 和 nvm ==========
+[INFO] 开始检测系统信息...
+[INFO] 系统检测完成：linux x86_64
+[WARN] 当前为 root 用户，将安装到 /root/mambaconda 目录
+[INFO] 开始安装基础依赖工具...
+Hit:1 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:2 https://pkg.cloudflareclient.com noble InRelease                           
+Hit:3 http://de.archive.ubuntu.com/ubuntu noble InRelease                        
+Hit:4 http://de.archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:5 http://de.archive.ubuntu.com/ubuntu noble-backports InRelease
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+7 packages can be upgraded. Run 'apt list --upgradable' to see them.
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+curl is already the newest version (8.5.0-2ubuntu10.8).
+wget is already the newest version (1.21.4-1ubuntu4.1).
+git is already the newest version (1:2.43.0-1ubuntu7.3).
+ca-certificates is already the newest version (20240203).
+0 upgraded, 0 newly installed, 0 to remove and 7 not upgraded.
+[INFO] 基础依赖工具安装完成
+[INFO] 开始获取各工具最新稳定版版本号...
+[INFO] 获取 Mambaconda 最新稳定版...
+[INFO] Mambaconda 最新稳定版：26.1.0-0
+[INFO] 获取 NVM 最新稳定版...
+[INFO] NVM 最新稳定版：v0.40.4
+[INFO] 开始安装 Mambaconda（稳定版 26.1.0-0）...
+[INFO] 下载 Mambaconda 安装包（中科大源）...
+[INFO] 中科大源下载失败，尝试 GitHub 官方源...
+PREFIX=/root/mambaconda
+Unpacking bootstrapper...
+Unpacking payload...
+Extracting _libgcc_mutex-0.1-conda_forge.tar.bz2
+Extracting ca-certificates-2026.1.4-hbd8a1cb_0.conda
+Extracting libgomp-15.2.0-he0feb66_17.conda
+Extracting nlohmann_json-abi-3.12.0-h0f90c79_1.conda
+Extracting pybind11-abi-11-hc364b38_1.conda
+Extracting python_abi-3.13-8_cp313.conda
+Extracting tzdata-2025c-hc9c84f9_1.conda
+Extracting _openmp_mutex-4.5-2_gnu.tar.bz2
+Extracting libgcc-15.2.0-he0feb66_17.conda
+Extracting bzip2-1.0.8-hda65f42_8.conda
+Extracting c-ares-1.34.6-hb03c661_0.conda
+Extracting keyutils-1.6.3-hb9d3cd8_0.conda
+Extracting libexpat-2.7.3-hecca717_0.conda
+Extracting libffi-3.5.2-h3435931_0.conda
+Extracting libgcc-ng-15.2.0-h69a702a_17.conda
+Extracting libiconv-1.18-h3b78370_2.conda
+Extracting liblzma-5.8.2-hb03c661_0.conda
+Extracting libmpdec-4.0.0-hb03c661_1.conda
+Extracting libstdcxx-15.2.0-h934c35e_17.conda
+Extracting libuuid-2.41.3-h5347b49_0.conda
+Extracting libzlib-1.3.1-hb9d3cd8_2.conda
+Extracting lzo-2.10-h280c20c_1002.conda
+Extracting ncurses-6.5-h2d0b736_3.conda
+Extracting openssl-3.6.1-h35e630c_1.conda
+Extracting reproc-14.2.5.post0-hb9d3cd8_0.conda
+Extracting cpp-expected-1.3.1-h171cf75_0.conda
+Extracting fmt-12.1.0-hff5e90c_0.conda
+Extracting icu-78.2-h33c6efd_0.conda
+Extracting libedit-3.1.20250104-pl5321h7949ede_0.conda
+Extracting libev-4.33-hd590300_2.conda
+Extracting libsolv-0.7.35-h9463b59_0.conda
+Extracting libssh2-1.11.1-hcf80075_0.conda
+Extracting libstdcxx-ng-15.2.0-hdf11a46_17.conda
+Extracting lz4-c-1.10.0-h5888daf_1.conda
+Extracting readline-8.3-h853b02a_0.conda
+Extracting reproc-cpp-14.2.5.post0-h5888daf_0.conda
+Extracting simdjson-4.2.4-hb700be7_0.conda
+Extracting tk-8.6.13-noxft_h366c992_103.conda
+Extracting yaml-cpp-0.8.0-h3f2d84a_0.conda
+Extracting zstd-1.5.7-hb78ec9c_6.conda
+Extracting krb5-1.21.3-h659f571_0.conda
+Extracting ld_impl_linux-64-2.45.1-default_hbd61a6d_101.conda
+Extracting libnghttp2-1.67.0-had1ee68_0.conda
+Extracting libsqlite-3.51.2-hf4e2dac_0.conda
+Extracting libxml2-16-2.15.1-hca6bf5a_1.conda
+Extracting spdlog-1.17.0-hab81395_1.conda
+Extracting libcurl-8.18.0-h4e3cde8_0.conda
+Extracting libxml2-2.15.1-he237659_1.conda
+Extracting python-3.13.12-hc97d973_100_cp313.conda
+Extracting libarchive-3.8.5-gpl_hc2c16d8_100.conda
+Extracting menuinst-2.4.2-py313h78bf25f_0.conda
+Extracting archspec-0.2.5-pyhd8ed1ab_0.conda
+Extracting backports.zstd-1.3.0-py313h18e8e13_0.conda
+Extracting boltons-25.0.0-pyhd8ed1ab_0.conda
+Extracting brotli-python-1.2.0-py313hf159716_1.conda
+Extracting certifi-2026.1.4-pyhd8ed1ab_0.conda
+Extracting charset-normalizer-3.4.4-pyhd8ed1ab_0.conda
+Extracting distro-1.9.0-pyhd8ed1ab_1.conda
+Extracting frozendict-2.4.7-py313h07c4f96_0.conda
+Extracting hpack-4.1.0-pyhd8ed1ab_0.conda
+Extracting hyperframe-6.1.0-pyhd8ed1ab_0.conda
+Extracting idna-3.11-pyhd8ed1ab_0.conda
+Extracting jsonpointer-3.0.0-pyhcf101f3_3.conda
+Extracting libmamba-2.5.0-hd28c85e_0.conda
+Extracting msgpack-python-1.1.2-py313h7037e92_1.conda
+Extracting packaging-26.0-pyhcf101f3_0.conda
+Extracting pip-26.0.1-pyh145f28c_0.conda
+Extracting platformdirs-4.5.1-pyhcf101f3_0.conda
+Extracting pluggy-1.6.0-pyhf9edf01_1.conda
+Extracting pycosat-0.6.6-py313h07c4f96_3.conda
+Extracting pycparser-2.22-pyh29332c3_1.conda
+Extracting pysocks-1.7.1-pyha55dd90_7.conda
+Extracting ruamel.yaml.clib-0.2.15-py313h54dd161_1.conda
+Extracting setuptools-82.0.0-pyh332efcf_0.conda
+Extracting tqdm-4.67.3-pyh8f84b5b_0.conda
+Extracting truststore-0.10.4-pyhcf101f3_0.conda
+Extracting cffi-2.0.0-py313hf46b229_1.conda
+Extracting h2-4.3.0-pyhcf101f3_0.conda
+Extracting jsonpatch-1.33-pyhd8ed1ab_1.conda
+Extracting libmamba-spdlog-2.5.0-h12fcf84_0.conda
+Extracting mamba-2.5.0-h9835478_0.conda
+Extracting ruamel.yaml-0.18.17-py313h54dd161_2.conda
+Extracting libmambapy-2.5.0-py313h4616538_0.conda
+Extracting urllib3-2.6.3-pyhd8ed1ab_0.conda
+Extracting zstandard-0.25.0-py313h54dd161_1.conda
+Extracting conda-package-streaming-0.12.0-pyhd8ed1ab_0.conda
+Extracting requests-2.32.5-pyhcf101f3_1.conda
+Extracting conda-libmamba-solver-25.11.0-pyhd8ed1ab_1.conda
+Extracting conda-package-handling-2.4.0-pyh7900ff3_2.conda
+Extracting conda-26.1.0-py313h78bf25f_0.conda
+
+Installing base environment...
+
+Transaction
+
+  Prefix: /root/mambaconda
+
+  Updating specs:
+
+   - _libgcc_mutex==0.1=conda_forge
+   - ca-certificates==2026.1.4=hbd8a1cb_0
+   - libgomp==15.2.0=he0feb66_17
+   - nlohmann_json-abi==3.12.0=h0f90c79_1
+   - pybind11-abi==11=hc364b38_1
+   - python_abi==3.13=8_cp313
+   - tzdata==2025c=hc9c84f9_1
+   - _openmp_mutex==4.5=2_gnu
+   - libgcc==15.2.0=he0feb66_17
+   - bzip2==1.0.8=hda65f42_8
+   - c-ares==1.34.6=hb03c661_0
+   - keyutils==1.6.3=hb9d3cd8_0
+   - libexpat==2.7.3=hecca717_0
+   - libffi==3.5.2=h3435931_0
+   - libgcc-ng==15.2.0=h69a702a_17
+   - libiconv==1.18=h3b78370_2
+   - liblzma==5.8.2=hb03c661_0
+   - libmpdec==4.0.0=hb03c661_1
+   - libstdcxx==15.2.0=h934c35e_17
+   - libuuid==2.41.3=h5347b49_0
+   - libzlib==1.3.1=hb9d3cd8_2
+   - lzo==2.10=h280c20c_1002
+   - ncurses==6.5=h2d0b736_3
+   - openssl==3.6.1=h35e630c_1
+   - reproc==14.2.5.post0=hb9d3cd8_0
+   - cpp-expected==1.3.1=h171cf75_0
+   - fmt==12.1.0=hff5e90c_0
+   - icu==78.2=h33c6efd_0
+   - libedit==3.1.20250104=pl5321h7949ede_0
+   - libev==4.33=hd590300_2
+   - libsolv==0.7.35=h9463b59_0
+   - libssh2==1.11.1=hcf80075_0
+   - libstdcxx-ng==15.2.0=hdf11a46_17
+   - lz4-c==1.10.0=h5888daf_1
+   - readline==8.3=h853b02a_0
+   - reproc-cpp==14.2.5.post0=h5888daf_0
+   - simdjson==4.2.4=hb700be7_0
+   - tk==8.6.13=noxft_h366c992_103
+   - yaml-cpp==0.8.0=h3f2d84a_0
+   - zstd==1.5.7=hb78ec9c_6
+   - krb5==1.21.3=h659f571_0
+   - ld_impl_linux-64==2.45.1=default_hbd61a6d_101
+   - libnghttp2==1.67.0=had1ee68_0
+   - libsqlite==3.51.2=hf4e2dac_0
+   - libxml2-16==2.15.1=hca6bf5a_1
+   - spdlog==1.17.0=hab81395_1
+   - libcurl==8.18.0=h4e3cde8_0
+   - libxml2==2.15.1=he237659_1
+   - python==3.13.12=hc97d973_100_cp313
+   - libarchive==3.8.5=gpl_hc2c16d8_100
+   - menuinst==2.4.2=py313h78bf25f_0
+   - archspec==0.2.5=pyhd8ed1ab_0
+   - backports.zstd==1.3.0=py313h18e8e13_0
+   - boltons==25.0.0=pyhd8ed1ab_0
+   - brotli-python==1.2.0=py313hf159716_1
+   - certifi==2026.1.4=pyhd8ed1ab_0
+   - charset-normalizer==3.4.4=pyhd8ed1ab_0
+   - distro==1.9.0=pyhd8ed1ab_1
+   - frozendict==2.4.7=py313h07c4f96_0
+   - hpack==4.1.0=pyhd8ed1ab_0
+   - hyperframe==6.1.0=pyhd8ed1ab_0
+   - idna==3.11=pyhd8ed1ab_0
+   - jsonpointer==3.0.0=pyhcf101f3_3
+   - libmamba==2.5.0=hd28c85e_0
+   - msgpack-python==1.1.2=py313h7037e92_1
+   - packaging==26.0=pyhcf101f3_0
+   - pip==26.0.1=pyh145f28c_0
+   - platformdirs==4.5.1=pyhcf101f3_0
+   - pluggy==1.6.0=pyhf9edf01_1
+   - pycosat==0.6.6=py313h07c4f96_3
+   - pycparser==2.22=pyh29332c3_1
+   - pysocks==1.7.1=pyha55dd90_7
+   - ruamel.yaml.clib==0.2.15=py313h54dd161_1
+   - setuptools==82.0.0=pyh332efcf_0
+   - tqdm==4.67.3=pyh8f84b5b_0
+   - truststore==0.10.4=pyhcf101f3_0
+   - cffi==2.0.0=py313hf46b229_1
+   - h2==4.3.0=pyhcf101f3_0
+   - jsonpatch==1.33=pyhd8ed1ab_1
+   - libmamba-spdlog==2.5.0=h12fcf84_0
+   - mamba==2.5.0=h9835478_0
+   - ruamel.yaml==0.18.17=py313h54dd161_2
+   - libmambapy==2.5.0=py313h4616538_0
+   - urllib3==2.6.3=pyhd8ed1ab_0
+   - zstandard==0.25.0=py313h54dd161_1
+   - conda-package-streaming==0.12.0=pyhd8ed1ab_0
+   - requests==2.32.5=pyhcf101f3_1
+   - conda-libmamba-solver==25.11.0=pyhd8ed1ab_1
+   - conda-package-handling==2.4.0=pyh7900ff3_2
+   - conda==26.1.0=py313h78bf25f_0
+
+
+  Package                         Version  Build                 Channel         Size
+───────────────────────────────────────────────────────────────────────────────────────
+  Install:
+───────────────────────────────────────────────────────────────────────────────────────
+
+  + _libgcc_mutex                     0.1  conda_forge           conda-forge         
+  + _openmp_mutex                     4.5  2_gnu                 conda-forge         
+  + archspec                        0.2.5  pyhd8ed1ab_0          conda-forge         
+  + backports.zstd                  1.3.0  py313h18e8e13_0       conda-forge         
+  + boltons                        25.0.0  pyhd8ed1ab_0          conda-forge         
+  + brotli-python                   1.2.0  py313hf159716_1       conda-forge         
+  + bzip2                           1.0.8  hda65f42_8            conda-forge         
+  + c-ares                         1.34.6  hb03c661_0            conda-forge         
+  + ca-certificates              2026.1.4  hbd8a1cb_0            conda-forge         
+  + certifi                      2026.1.4  pyhd8ed1ab_0          conda-forge         
+  + cffi                            2.0.0  py313hf46b229_1       conda-forge         
+  + charset-normalizer              3.4.4  pyhd8ed1ab_0          conda-forge         
+  + conda                          26.1.0  py313h78bf25f_0       conda-forge         
+  + conda-libmamba-solver         25.11.0  pyhd8ed1ab_1          conda-forge         
+  + conda-package-handling          2.4.0  pyh7900ff3_2          conda-forge         
+  + conda-package-streaming        0.12.0  pyhd8ed1ab_0          conda-forge         
+  + cpp-expected                    1.3.1  h171cf75_0            conda-forge         
+  + distro                          1.9.0  pyhd8ed1ab_1          conda-forge         
+  + fmt                            12.1.0  hff5e90c_0            conda-forge         
+  + frozendict                      2.4.7  py313h07c4f96_0       conda-forge         
+  + h2                              4.3.0  pyhcf101f3_0          conda-forge         
+  + hpack                           4.1.0  pyhd8ed1ab_0          conda-forge         
+  + hyperframe                      6.1.0  pyhd8ed1ab_0          conda-forge         
+  + icu                              78.2  h33c6efd_0            conda-forge         
+  + idna                             3.11  pyhd8ed1ab_0          conda-forge         
+  + jsonpatch                        1.33  pyhd8ed1ab_1          conda-forge         
+  + jsonpointer                     3.0.0  pyhcf101f3_3          conda-forge         
+  + keyutils                        1.6.3  hb9d3cd8_0            conda-forge         
+  + krb5                           1.21.3  h659f571_0            conda-forge         
+  + ld_impl_linux-64               2.45.1  default_hbd61a6d_101  conda-forge         
+  + libarchive                      3.8.5  gpl_hc2c16d8_100      conda-forge         
+  + libcurl                        8.18.0  h4e3cde8_0            conda-forge         
+  + libedit                  3.1.20250104  pl5321h7949ede_0      conda-forge         
+  + libev                            4.33  hd590300_2            conda-forge         
+  + libexpat                        2.7.3  hecca717_0            conda-forge         
+  + libffi                          3.5.2  h3435931_0            conda-forge         
+  + libgcc                         15.2.0  he0feb66_17           conda-forge         
+  + libgcc-ng                      15.2.0  h69a702a_17           conda-forge         
+  + libgomp                        15.2.0  he0feb66_17           conda-forge         
+  + libiconv                         1.18  h3b78370_2            conda-forge         
+  + liblzma                         5.8.2  hb03c661_0            conda-forge         
+  + libmamba                        2.5.0  hd28c85e_0            conda-forge         
+  + libmamba-spdlog                 2.5.0  h12fcf84_0            conda-forge         
+  + libmambapy                      2.5.0  py313h4616538_0       conda-forge         
+  + libmpdec                        4.0.0  hb03c661_1            conda-forge         
+  + libnghttp2                     1.67.0  had1ee68_0            conda-forge         
+  + libsolv                        0.7.35  h9463b59_0            conda-forge         
+  + libsqlite                      3.51.2  hf4e2dac_0            conda-forge         
+  + libssh2                        1.11.1  hcf80075_0            conda-forge         
+  + libstdcxx                      15.2.0  h934c35e_17           conda-forge         
+  + libstdcxx-ng                   15.2.0  hdf11a46_17           conda-forge         
+  + libuuid                        2.41.3  h5347b49_0            conda-forge         
+  + libxml2                        2.15.1  he237659_1            conda-forge         
+  + libxml2-16                     2.15.1  hca6bf5a_1            conda-forge         
+  + libzlib                         1.3.1  hb9d3cd8_2            conda-forge         
+  + lz4-c                          1.10.0  h5888daf_1            conda-forge         
+  + lzo                              2.10  h280c20c_1002         conda-forge         
+  + mamba                           2.5.0  h9835478_0            conda-forge         
+  + menuinst                        2.4.2  py313h78bf25f_0       conda-forge         
+  + msgpack-python                  1.1.2  py313h7037e92_1       conda-forge         
+  + ncurses                           6.5  h2d0b736_3            conda-forge         
+  + nlohmann_json-abi              3.12.0  h0f90c79_1            conda-forge         
+  + openssl                         3.6.1  h35e630c_1            conda-forge         
+  + packaging                        26.0  pyhcf101f3_0          conda-forge         
+  + pip                            26.0.1  pyh145f28c_0          conda-forge         
+  + platformdirs                    4.5.1  pyhcf101f3_0          conda-forge         
+  + pluggy                          1.6.0  pyhf9edf01_1          conda-forge         
+  + pybind11-abi                       11  hc364b38_1            conda-forge         
+  + pycosat                         0.6.6  py313h07c4f96_3       conda-forge         
+  + pycparser                        2.22  pyh29332c3_1          conda-forge         
+  + pysocks                         1.7.1  pyha55dd90_7          conda-forge         
+  + python                        3.13.12  hc97d973_100_cp313    conda-forge         
+  + python_abi                       3.13  8_cp313               conda-forge         
+  + readline                          8.3  h853b02a_0            conda-forge         
+  + reproc                   14.2.5.post0  hb9d3cd8_0            conda-forge         
+  + reproc-cpp               14.2.5.post0  h5888daf_0            conda-forge         
+  + requests                       2.32.5  pyhcf101f3_1          conda-forge         
+  + ruamel.yaml                   0.18.17  py313h54dd161_2       conda-forge         
+  + ruamel.yaml.clib               0.2.15  py313h54dd161_1       conda-forge         
+  + setuptools                     82.0.0  pyh332efcf_0          conda-forge         
+  + simdjson                        4.2.4  hb700be7_0            conda-forge         
+  + spdlog                         1.17.0  hab81395_1            conda-forge         
+  + tk                             8.6.13  noxft_h366c992_103    conda-forge         
+  + tqdm                           4.67.3  pyh8f84b5b_0          conda-forge         
+  + truststore                     0.10.4  pyhcf101f3_0          conda-forge         
+  + tzdata                          2025c  hc9c84f9_1            conda-forge         
+  + urllib3                         2.6.3  pyhd8ed1ab_0          conda-forge         
+  + yaml-cpp                        0.8.0  h3f2d84a_0            conda-forge         
+  + zstandard                      0.25.0  py313h54dd161_1       conda-forge         
+  + zstd                            1.5.7  hb78ec9c_6            conda-forge         
+
+  Summary:
+
+  Install: 90 packages
+
+  Total download: 0 B
+
+───────────────────────────────────────────────────────────────────────────────────────
+
+
+
+Transaction starting
+Linking _libgcc_mutex-0.1-conda_forge
+Linking ca-certificates-2026.1.4-hbd8a1cb_0
+Linking libgomp-15.2.0-he0feb66_17
+Linking nlohmann_json-abi-3.12.0-h0f90c79_1
+Linking pybind11-abi-11-hc364b38_1
+Linking python_abi-3.13-8_cp313
+Linking tzdata-2025c-hc9c84f9_1
+Linking _openmp_mutex-4.5-2_gnu
+Linking libgcc-15.2.0-he0feb66_17
+Linking bzip2-1.0.8-hda65f42_8
+Linking c-ares-1.34.6-hb03c661_0
+Linking keyutils-1.6.3-hb9d3cd8_0
+Linking libexpat-2.7.3-hecca717_0
+Linking libffi-3.5.2-h3435931_0
+Linking libgcc-ng-15.2.0-h69a702a_17
+Linking libiconv-1.18-h3b78370_2
+Linking liblzma-5.8.2-hb03c661_0
+Linking libmpdec-4.0.0-hb03c661_1
+Linking libstdcxx-15.2.0-h934c35e_17
+Linking libuuid-2.41.3-h5347b49_0
+Linking libzlib-1.3.1-hb9d3cd8_2
+Linking lzo-2.10-h280c20c_1002
+Linking ncurses-6.5-h2d0b736_3
+Linking openssl-3.6.1-h35e630c_1
+Linking reproc-14.2.5.post0-hb9d3cd8_0
+Linking cpp-expected-1.3.1-h171cf75_0
+Linking fmt-12.1.0-hff5e90c_0
+Linking icu-78.2-h33c6efd_0
+Linking libedit-3.1.20250104-pl5321h7949ede_0
+Linking libev-4.33-hd590300_2
+Linking libsolv-0.7.35-h9463b59_0
+Linking libssh2-1.11.1-hcf80075_0
+Linking libstdcxx-ng-15.2.0-hdf11a46_17
+Linking lz4-c-1.10.0-h5888daf_1
+Linking readline-8.3-h853b02a_0
+Linking reproc-cpp-14.2.5.post0-h5888daf_0
+Linking simdjson-4.2.4-hb700be7_0
+Linking tk-8.6.13-noxft_h366c992_103
+Linking yaml-cpp-0.8.0-h3f2d84a_0
+Linking zstd-1.5.7-hb78ec9c_6
+Linking krb5-1.21.3-h659f571_0
+Linking ld_impl_linux-64-2.45.1-default_hbd61a6d_101
+Linking libnghttp2-1.67.0-had1ee68_0
+Linking libsqlite-3.51.2-hf4e2dac_0
+Linking libxml2-16-2.15.1-hca6bf5a_1
+Linking spdlog-1.17.0-hab81395_1
+Linking libcurl-8.18.0-h4e3cde8_0
+Linking libxml2-2.15.1-he237659_1
+Linking python-3.13.12-hc97d973_100_cp313
+Linking libarchive-3.8.5-gpl_hc2c16d8_100
+Linking menuinst-2.4.2-py313h78bf25f_0
+Linking archspec-0.2.5-pyhd8ed1ab_0
+Linking backports.zstd-1.3.0-py313h18e8e13_0
+Linking boltons-25.0.0-pyhd8ed1ab_0
+Linking brotli-python-1.2.0-py313hf159716_1
+Linking certifi-2026.1.4-pyhd8ed1ab_0
+Linking charset-normalizer-3.4.4-pyhd8ed1ab_0
+Linking distro-1.9.0-pyhd8ed1ab_1
+Linking frozendict-2.4.7-py313h07c4f96_0
+Linking hpack-4.1.0-pyhd8ed1ab_0
+Linking hyperframe-6.1.0-pyhd8ed1ab_0
+Linking idna-3.11-pyhd8ed1ab_0
+Linking jsonpointer-3.0.0-pyhcf101f3_3
+Linking libmamba-2.5.0-hd28c85e_0
+Linking msgpack-python-1.1.2-py313h7037e92_1
+Linking packaging-26.0-pyhcf101f3_0
+Linking pip-26.0.1-pyh145f28c_0
+Linking platformdirs-4.5.1-pyhcf101f3_0
+Linking pluggy-1.6.0-pyhf9edf01_1
+Linking pycosat-0.6.6-py313h07c4f96_3
+Linking pycparser-2.22-pyh29332c3_1
+Linking pysocks-1.7.1-pyha55dd90_7
+Linking ruamel.yaml.clib-0.2.15-py313h54dd161_1
+Linking setuptools-82.0.0-pyh332efcf_0
+Linking tqdm-4.67.3-pyh8f84b5b_0
+Linking truststore-0.10.4-pyhcf101f3_0
+Linking cffi-2.0.0-py313hf46b229_1
+Linking h2-4.3.0-pyhcf101f3_0
+Linking jsonpatch-1.33-pyhd8ed1ab_1
+Linking libmamba-spdlog-2.5.0-h12fcf84_0
+Linking mamba-2.5.0-h9835478_0
+Linking ruamel.yaml-0.18.17-py313h54dd161_2
+Linking libmambapy-2.5.0-py313h4616538_0
+Linking urllib3-2.6.3-pyhd8ed1ab_0
+Linking zstandard-0.25.0-py313h54dd161_1
+Linking conda-package-streaming-0.12.0-pyhd8ed1ab_0
+Linking requests-2.32.5-pyhcf101f3_1
+Linking conda-libmamba-solver-25.11.0-pyhd8ed1ab_1
+Linking conda-package-handling-2.4.0-pyh7900ff3_2
+Linking conda-26.1.0-py313h78bf25f_0
+
+Transaction finished
+
+installation finished.
+[INFO] 配置 conda 环境变量...
+[INFO] conda 环境变量配置完成
+WARNING: The MAMBA_ROOT_PREFIX environment variable is not set.
+WARNING: This is required for mamba to work correctly as of 2.0.
+WARNING: 
+WARNING: For now, we are setting 'MAMBA_ROOT_PREFIX' to '/root/mambaconda'.
+WARNING: 
+WARNING: Please make sure this is consistent with your installation or alternatively (by order of preference):
+WARNING:   - rerun 'mamba shell init' to initialize mamba for your current shell
+WARNING:   - manually set 'MAMBA_ROOT_PREFIX' to the root of your installation in your shell profile script.
+WARNING:   - use the '-r,--root-prefix' CLI option when calling mamba.
+WARNING: 
+WARNING: This message originates from /root/mambaconda/etc/profile.d/mamba.sh
+[INFO] 配置 conda 清华源...
+[INFO] 安装 Python 3.10...
+Channels:
+ - defaults
+ - conda-forge
+Platform: linux-64
+Collecting package metadata (repodata.json): done
+Solving environment: done
+
+
+==> WARNING: A newer version of conda exists. <==
+    current version: 26.1.0
+    latest version: 26.1.1
+
+Please update conda by running
+
+    $ conda update -n base -c conda-forge conda
+
+
+
+## Package Plan ##
+
+  environment location: /root/mambaconda
+
+  added / updated specs:
+    - python=3.10
+
+
+The following packages will be downloaded:
+
+    package                    |            build
+    ---------------------------|-----------------
+    backports.zstd-1.3.0       |  py310h89db63a_0         293 KB  defaults
+    brotli-python-1.2.0        |  py310h3dd09e2_0         345 KB  defaults
+    cffi-2.0.0                 |  py310h4eded50_1         237 KB  defaults
+    conda-26.1.1               |  py310h06a4308_0         975 KB  defaults
+    frozendict-2.4.6           |  py310hee96239_0          57 KB  defaults
+    libexpat-2.7.4             |       h7354ed3_0         122 KB  defaults
+    libffi-3.4.4               |       h6a678d5_1         141 KB  defaults
+    libmambapy-2.5.0           |  py310h74f1d5f_0         921 KB  conda-forge
+    libnsl-2.0.0               |       h5eee18b_0          31 KB  defaults
+    libuuid-1.41.5             |       h5eee18b_0          27 KB  defaults
+    libxcb-1.17.0              |       h9b100fa_0         430 KB  defaults
+    menuinst-2.4.2             |  py310h06a4308_1         225 KB  defaults
+    msgpack-python-1.1.1       |  py310h6a678d5_0         112 KB  defaults
+    pip-26.0.1                 |     pyhc872135_0         1.1 MB  defaults
+    pthread-stubs-0.3          |       h0ce48e5_1           5 KB  defaults
+    pycosat-0.6.6              |  py310h5eee18b_2          88 KB  defaults
+    python-3.10.20             |       h741d88c_0        24.1 MB  defaults
+    python_abi-3.10            |          3_cp310           6 KB  defaults
+    ruamel.yaml-0.18.16        |  py310h4aee224_0         199 KB  defaults
+    ruamel.yaml.clib-0.2.14    |  py310h4aee224_0         133 KB  defaults
+    sqlite-3.51.2              |       h3e8d24a_0         1.2 MB  defaults
+    tk-8.6.15                  |       h54e0aa7_0         3.4 MB  defaults
+    wheel-0.46.3               |  py310h06a4308_0          54 KB  defaults
+    xorg-libx11-1.8.12         |       h9b100fa_1         895 KB  defaults
+    xorg-libxau-1.0.12         |       h9b100fa_0          13 KB  defaults
+    xorg-libxdmcp-1.1.5        |       h9b100fa_0          19 KB  defaults
+    xorg-xorgproto-2024.1      |       h5eee18b_1         580 KB  defaults
+    xz-5.8.2                   |       h448239c_0         621 KB  defaults
+    zlib-1.3.1                 |       hb9d3cd8_2          90 KB  conda-forge
+    zstandard-0.24.0           |  py310h3d778a8_0         397 KB  defaults
+    ------------------------------------------------------------
+                                           Total:        36.7 MB
+
+The following NEW packages will be INSTALLED:
+
+  libnsl             anaconda/pkgs/main/linux-64::libnsl-2.0.0-h5eee18b_0 
+  libxcb             anaconda/pkgs/main/linux-64::libxcb-1.17.0-h9b100fa_0 
+  pthread-stubs      anaconda/pkgs/main/linux-64::pthread-stubs-0.3-h0ce48e5_1 
+  sqlite             anaconda/pkgs/main/linux-64::sqlite-3.51.2-h3e8d24a_0 
+  wheel              anaconda/pkgs/main/linux-64::wheel-0.46.3-py310h06a4308_0 
+  xorg-libx11        anaconda/pkgs/main/linux-64::xorg-libx11-1.8.12-h9b100fa_1 
+  xorg-libxau        anaconda/pkgs/main/linux-64::xorg-libxau-1.0.12-h9b100fa_0 
+  xorg-libxdmcp      anaconda/pkgs/main/linux-64::xorg-libxdmcp-1.1.5-h9b100fa_0 
+  xorg-xorgproto     anaconda/pkgs/main/linux-64::xorg-xorgproto-2024.1-h5eee18b_1 
+  xz                 anaconda/pkgs/main/linux-64::xz-5.8.2-h448239c_0 
+  zlib               conda-forge/linux-64::zlib-1.3.1-hb9d3cd8_2 
+
+The following packages will be REMOVED:
+
+  libmpdec-4.0.0-hb03c661_1
+
+The following packages will be UPDATED:
+
+  conda              conda-forge::conda-26.1.0-py313h78bf2~ --> anaconda/pkgs/main::conda-26.1.1-py310h06a4308_0 
+  libexpat           conda-forge::libexpat-2.7.3-hecca717_0 --> anaconda/pkgs/main::libexpat-2.7.4-h7354ed3_0 
+  menuinst           conda-forge::menuinst-2.4.2-py313h78b~ --> anaconda/pkgs/main::menuinst-2.4.2-py310h06a4308_1 
+  tk                 conda-forge::tk-8.6.13-noxft_h366c992~ --> anaconda/pkgs/main::tk-8.6.15-h54e0aa7_0 
+
+The following packages will be SUPERSEDED by a higher-priority channel:
+
+  backports.zstd     conda-forge::backports.zstd-1.3.0-py3~ --> anaconda/pkgs/main::backports.zstd-1.3.0-py310h89db63a_0 
+  brotli-python      conda-forge::brotli-python-1.2.0-py31~ --> anaconda/pkgs/main::brotli-python-1.2.0-py310h3dd09e2_0 
+  cffi               conda-forge::cffi-2.0.0-py313hf46b229~ --> anaconda/pkgs/main::cffi-2.0.0-py310h4eded50_1 
+  frozendict         conda-forge::frozendict-2.4.7-py313h0~ --> anaconda/pkgs/main::frozendict-2.4.6-py310hee96239_0 
+  libffi               conda-forge::libffi-3.5.2-h3435931_0 --> anaconda/pkgs/main::libffi-3.4.4-h6a678d5_1 
+  libuuid            conda-forge::libuuid-2.41.3-h5347b49_0 --> anaconda/pkgs/main::libuuid-1.41.5-h5eee18b_0 
+  msgpack-python     conda-forge::msgpack-python-1.1.2-py3~ --> anaconda/pkgs/main::msgpack-python-1.1.1-py310h6a678d5_0 
+  pip                  conda-forge::pip-26.0.1-pyh145f28c_0 --> anaconda/pkgs/main::pip-26.0.1-pyhc872135_0 
+  pycosat            conda-forge::pycosat-0.6.6-py313h07c4~ --> anaconda/pkgs/main::pycosat-0.6.6-py310h5eee18b_2 
+  python             conda-forge::python-3.13.12-hc97d973_~ --> anaconda/pkgs/main::python-3.10.20-h741d88c_0 
+  python_abi         conda-forge/noarch::python_abi-3.13-8~ --> anaconda/pkgs/main/linux-64::python_abi-3.10-3_cp310 
+  ruamel.yaml        conda-forge::ruamel.yaml-0.18.17-py31~ --> anaconda/pkgs/main::ruamel.yaml-0.18.16-py310h4aee224_0 
+  ruamel.yaml.clib   conda-forge::ruamel.yaml.clib-0.2.15-~ --> anaconda/pkgs/main::ruamel.yaml.clib-0.2.14-py310h4aee224_0 
+  zstandard          conda-forge::zstandard-0.25.0-py313h5~ --> anaconda/pkgs/main::zstandard-0.24.0-py310h3d778a8_0 
+
+The following packages will be REVISED:
+
+  libmambapy                          2.5.0-py313h4616538_0 --> 2.5.0-py310h74f1d5f_0 
+
+
+
+Downloading and Extracting Packages:
+                                                                                                                                                                                                                                                                    
+Preparing transaction: done                                                                                                                                                                                                                                         
+Verifying transaction: done                                                                                                                                                                                                                                         
+Executing transaction: done                                                                                                                                                                                                                                         
+no change     /root/mambaconda/condabin/conda                                                                                                                                                                                                                       
+no change     /root/mambaconda/bin/conda                                                                                                                                                                                                                            
+no change     /root/mambaconda/bin/conda-env                                                                                                                                                                                                                        
+no change     /root/mambaconda/bin/activate                                                                                                                                                                                                                         
+no change     /root/mambaconda/bin/deactivate                                                                                                                                                                                                                       
+no change     /root/mambaconda/etc/profile.d/conda.sh                                                                                                                                                                                                               
+no change     /root/mambaconda/etc/fish/conf.d/conda.fish                                                                                                                                                                                                           
+no change     /root/mambaconda/shell/condabin/Conda.psm1                                                                                                                                                                                                            
+no change     /root/mambaconda/shell/condabin/conda-hook.ps1                                                                                                                                                                                                        
+no change     /root/mambaconda/lib/python3.10/site-packages/xontrib/conda.xsh                                                                                                                                                                                       
+no change     /root/mambaconda/etc/profile.d/conda.csh                                                                                                                                                                                                              
+modified      /root/.bashrc                                                                                                                                                                                                                                         
+                                                                                                                                                                                                                                                                    
+==> For changes to take effect, close and re-open your current shell. <==                                                                                                                                                                                           
+                                                                                                                                                                                                                                                                    
+[INFO] Mambaconda 稳定版安装并配置完成                                                                                                                                                                                                                              
+[INFO] 开始安装 NVM（稳定版 v0.40.4）...                                                                                                                                                                                                                            
+[INFO] 下载 NVM 安装脚本（稳定版）...                                                                                                                                                                                                                               
+=> Downloading nvm from git to '/root/.nvm'                                                                                                                                                                                                                         
+=> Cloning into '/root/.nvm'...                                                                                                                                                                                                                                     
+remote: Enumerating objects: 405, done.
+remote: Counting objects: 100% (405/405), done.
+remote: Compressing objects: 100% (332/332), done.
+remote: Total 405 (delta 59), reused 190 (delta 45), pack-reused 0 (from 0)
+Receiving objects: 100% (405/405), 405.94 KiB | 4.46 MiB/s, done.                                                                                                                                                                                                   
+Resolving deltas: 100% (59/59), done.                                                                                                                                                                                                                               
+* (HEAD detached at FETCH_HEAD)
+  master
+=> Compressing and cleaning up git repository
+
+=> nvm source string already in /root/.bashrc
+=> bash_completion source string already in /root/.bashrc
+=> Close and reopen your terminal to start using nvm or run the following to use it now:
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[INFO] 配置 nvm 环境变量...
+[INFO] nvm 环境变量配置完成
+[INFO] 配置 nvm 淘宝镜像源...
+[INFO] 安装 Node LTS 稳定版...
+Installing latest LTS version.
+Downloading and installing node v24.14.0...
+Downloading https://npmmirror.com/mirrors/node/v24.14.0/node-v24.14.0-linux-x64.tar.xz...
+######################################################################################################################################################################################################################################################### 100.0%-=O=######################################################################################################################################################################################################################################################### 100.0%
+Computing checksum with sha256sum
+Checksums matched!
+Now using node v24.14.0 (npm v11.9.0)
+Creating default alias: default -> lts/* (-> v24.14.0 *)
+default -> lts/* (-> v24.14.0)
+[INFO] 配置 npm 淘宝源...
+[INFO] NVM 稳定版安装并配置完成
+[INFO] 开始验证安装结果...
+[INFO] ✅ Mambaconda 安装成功：conda 26.1.1
+[INFO] ✅ Python 版本：Python 3.10.20
+[INFO] ✅ NVM 安装成功：0.40.4
+[INFO] ✅ Node 版本：v24.14.0
+[INFO] ✅ NPM 源：https://registry.npmmirror.com/
+[INFO] ========== 安装配置全部完成 ==========
+[INFO] 已安装的稳定版：
+[INFO]   - Mambaconda: 26.1.0-0 (Python 3.10)
+[INFO]   - NVM: v0.40.4 (Node LTS 稳定版)
+[INFO] 请执行以下命令使配置立即生效：
+source /root/.bashrc
+[INFO] 验证安装的命令：
+conda --version && python --version
+nvm --version && node --version && npm --version
+npm config get registry && conda config --show-sources
+root@ubuntu:~# source /root/.bashrc
+(base) root@ubuntu:~# nvm --version
+0.40.4
+(base) root@ubuntu:~# node -v
+v24.14.0
+(base) root@ubuntu:~# 

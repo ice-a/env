@@ -8,6 +8,7 @@
 - `install-docker.sh`：单独安装 Docker。
 - `install-nvm.sh`：单独安装 NVM，并自动安装 Node.js LTS。
 - `install-mambaconda.sh`：单独安装 Mambaconda，默认安装到 `$HOME/mambaconda`。
+- `tmp.log`：安装过程日志示例文件，用于排查安装问题和核对执行输出。
 - `uninstall.sh`：总卸载入口，支持交互式选择或命令行按需卸载。
 - `uninstall-docker.sh`：单独卸载 Docker，默认保留 Docker 数据。
 - `uninstall-nvm.sh`：单独卸载 NVM，并清理脚本追加的 Shell 初始化配置。
@@ -86,6 +87,34 @@ bash uninstall-mambaconda.sh
 - `install-mambaconda.sh` 会写入 `~/.condarc`，并使用国内镜像源。
 - `install-mambaconda.sh` 默认会安装 Python 3.10。
 - `uninstall-docker.sh` 默认不会删除 Docker 数据目录。
+
+## 关于 `tmp.log`
+
+仓库中的 `tmp.log` 是一次安装过程的输出日志示例，主要用于：
+
+- 查看脚本在真实环境中的执行顺序
+- 排查下载失败、权限不足、源不可达等问题
+- 核对安装完成后的版本输出和提示信息
+
+常见查看方式：
+
+```bash
+cat tmp.log
+tail -n 50 tmp.log
+grep ERROR tmp.log
+grep WARN tmp.log
+```
+
+说明：
+
+- `tmp.log` 不是脚本运行时强制生成的文件，它更像一份调试或留档日志。
+- 如果你需要记录自己的安装过程，可以手动重定向输出，例如：
+
+```bash
+bash install.sh all > tmp.log 2>&1
+```
+
+- 如果终端里看到中文乱码，通常是终端编码问题，不一定是日志内容损坏。
 
 如果需要在卸载 Docker 时同时删除数据，可使用：
 
