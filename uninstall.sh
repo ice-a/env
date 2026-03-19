@@ -35,13 +35,13 @@ section() {
 usage() {
     cat <<'EOF'
 用法:
-  bash install.sh                # 交互式选择安装项
-  bash install.sh all            # 安装全部工具
-  bash install.sh docker         # 仅安装 Docker
-  bash install.sh nvm            # 仅安装 NVM
-  bash install.sh mambaconda     # 仅安装 Mambaconda
-  bash install.sh docker nvm     # 安装多个指定工具
-  bash install.sh --help
+  bash uninstall.sh                # 交互式选择卸载项
+  bash uninstall.sh all            # 卸载全部工具
+  bash uninstall.sh docker         # 仅卸载 Docker
+  bash uninstall.sh nvm            # 仅卸载 NVM
+  bash uninstall.sh mambaconda     # 仅卸载 Mambaconda
+  bash uninstall.sh docker nvm     # 卸载多个指定工具
+  bash uninstall.sh --help
 EOF
 }
 
@@ -57,73 +57,73 @@ run_script() {
     bash "$script_path"
 }
 
-install_docker() {
-    run_script "install-docker.sh"
+uninstall_docker() {
+    run_script "uninstall-docker.sh"
 }
 
-install_nvm() {
-    run_script "install-nvm.sh"
+uninstall_nvm() {
+    run_script "uninstall-nvm.sh"
 }
 
-install_mambaconda() {
-    run_script "install-mambaconda.sh"
+uninstall_mambaconda() {
+    run_script "uninstall-mambaconda.sh"
 }
 
-install_targets() {
+uninstall_targets() {
     local target
 
     for target in "$@"; do
         case "$target" in
-            docker) install_docker ;;
-            nvm) install_nvm ;;
-            mambaconda) install_mambaconda ;;
+            docker) uninstall_docker ;;
+            nvm) uninstall_nvm ;;
+            mambaconda) uninstall_mambaconda ;;
             all)
-                install_docker
-                install_nvm
-                install_mambaconda
+                uninstall_docker
+                uninstall_nvm
+                uninstall_mambaconda
                 ;;
             *)
-                error "未知安装目标: $target"
+                error "未知卸载目标: $target"
                 ;;
         esac
     done
 }
 
-interactive_install() {
+interactive_uninstall() {
     local reply=""
     local selected=()
 
-    section "交互式安装"
+    section "交互式卸载"
 
-    read -r -p "是否安装 Docker? [y/N]: " reply
+    read -r -p "是否卸载 Docker? [y/N]: " reply
     if [[ "$reply" =~ ^[Yy]$ ]]; then
         selected+=("docker")
     fi
 
-    read -r -p "是否安装 NVM? [y/N]: " reply
+    read -r -p "是否卸载 NVM? [y/N]: " reply
     if [[ "$reply" =~ ^[Yy]$ ]]; then
         selected+=("nvm")
     fi
 
-    read -r -p "是否安装 Mambaconda? [y/N]: " reply
+    read -r -p "是否卸载 Mambaconda? [y/N]: " reply
     if [[ "$reply" =~ ^[Yy]$ ]]; then
         selected+=("mambaconda")
     fi
 
     if [[ ${#selected[@]} -eq 0 ]]; then
-        warn "未选择任何安装项。"
+        warn "未选择任何卸载项。"
         return
     fi
 
-    install_targets "${selected[@]}"
-    success "所选安装项已执行完成。"
+    uninstall_targets "${selected[@]}"
+    success "所选卸载项已执行完成。"
 }
 
 main() {
-    section "环境安装入口"
+    section "环境卸载入口"
 
     if [[ $# -eq 0 ]]; then
-        interactive_install
+        interactive_uninstall
         return
     fi
 
@@ -134,8 +134,8 @@ main() {
             ;;
     esac
 
-    install_targets "$@"
-    success "安装流程执行完成。"
+    uninstall_targets "$@"
+    success "卸载流程执行完成。"
 }
 
 main "$@"
