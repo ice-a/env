@@ -76,7 +76,7 @@ install_dependencies() {
         elif command -v dnf >/dev/null 2>&1; then
             run_privileged dnf install -y ca-certificates curl
         elif command -v yum >/dev/null 2>&1; then
-            run_privileged yum install -y ca-certificates curl
+            run_privileged env LANG="${LANG:-en_US.UTF-8}" LC_ALL="${LC_ALL:-${LANG:-en_US.UTF-8}}" yum --setopt=history_record=false install -y ca-certificates curl
         else
             error "当前 Linux 包管理器不受支持，请手动安装 curl 和 ca-certificates。"
         fi

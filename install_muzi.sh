@@ -15,6 +15,13 @@ CONDA_PATH="$HOME/mambaconda"
 LATEST_CONDA_VERSION=""
 LATEST_NVM_VERSION=""
 
+run_yum_install() {
+    local lang_value="${LANG:-en_US.UTF-8}"
+    local lc_all_value="${LC_ALL:-$lang_value}"
+    LANG="$lang_value" LC_ALL="$lc_all_value" \
+        yum --setopt=history_record=false install -y "$@"
+}
+
 # 打印信息函数
 info() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -101,7 +108,7 @@ install_dependencies() {
         if command -v apt &> /dev/null; then
             apt update && apt install -y curl wget git ca-certificates --no-install-recommends
         elif command -v yum &> /dev/null; then
-            yum install -y curl wget git ca-certificates
+            run_yum_install curl wget git ca-certificates
         elif command -v dnf &> /dev/null; then
             dnf install -y curl wget git ca-certificates
         else
