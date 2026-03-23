@@ -27,7 +27,14 @@
 ```bash
 bash install.sh
 ```
+自用conda、nvm
+```bash
+wget https://raw.githubusercontent.com/ice-a/env/master/install_muzi.sh
 
+# 后续步骤同上：赋权 + 执行
+chmod +x install_muzi.sh
+./install_muzi.sh
+```
 常见用法：
 
 ```bash
