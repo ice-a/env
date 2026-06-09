@@ -72,96 +72,160 @@ log_error_to_file() {
 }
 
 # ============================================================================
-# 交互式菜单
+# 交互式 TUI 菜单
 # ============================================================================
-show_menu() {
-    local total=${#MENU_ITEMS[@]}
+# 菜单状态
+declare -A MENU_SELECTED=()
+MENU_CURSOR=0
 
-    printf "\n"
-    printf "\033[1;36m╔══════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;36m║        Linux 开发语言自动安装工具                   ║\033[0m\n"
-    printf "\033[1;36m╚══════════════════════════════════════════════════════╝\033[0m\n"
-    printf "\n"
-
-    # 列出所有可选项
-    for ((i=0; i<total; i++)); do
-        IFS='|' read -r key desc default <<< "${MENU_ITEMS[i]}"
-        local num=$((i+1))
+# 初始化默认选中状态
+init_menu_selections() {
+    for item in "${MENU_ITEMS[@]}"; do
+        IFS='|' read -r key desc default <<< "${item}"
         if [[ "${default}" == "1" ]]; then
-            printf "  \033[1;32m%2d)\033[0m %s \033[0;33m(默认)\033[0m\n" "${num}" "${desc}"
+            MENU_SELECTED["${key}"]=1
         else
-            printf "  \033[1;32m%2d)\033[0m %s\n" "${num}" "${desc}"
+            MENU_SELECTED["${key}"]=0
         fi
     done
-
-    printf "\n"
-    printf "  \033[1;36ma)\033[0m 全部安装\n"
-    printf "  \033[1;36mq)\033[0m 退出\n"
-    printf "\n"
 }
 
-parse_selection() {
-    local input="$1"
+# 绘制菜单
+draw_menu() {
     local total=${#MENU_ITEMS[@]}
-    local selections=()
 
-    # 退出
-    if [[ "${input}" == "q" || "${input}" == "Q" ]]; then
-        echo "quit"
-        return
-    fi
+    # 清屏并移动光标到左上角
+    printf "\033[2J\033[H"
 
-    # 全部安装
-    if [[ "${input}" == "a" || "${input}" == "A" ]]; then
-        for item in "${MENU_ITEMS[@]}"; do
-            IFS='|' read -r key desc default <<< "${item}"
-            selections+=("${key}")
-        done
-        echo "${selections[*]}"
-        return
-    fi
+    # 隐藏光标
+    printf "\033[?25l"
 
-    # 空输入 - 使用默认选项
-    if [[ -z "${input}" ]]; then
-        for item in "${MENU_ITEMS[@]}"; do
-            IFS='|' read -r key desc default <<< "${item}"
-            if [[ "${default}" == "1" ]]; then
-                selections+=("${key}")
-            fi
-        done
-        if [[ ${#selections[@]} -eq 0 ]]; then
-            echo "none"
+    # 标题
+    printf "\n"
+    printf "\033[1;36m  ╔══════════════════════════════════════════════════════╗\033[0m\n"
+    printf "\033[1;36m  ║        Linux 开发语言自动安装工具                   ║\033[0m\n"
+    printf "\033[1;36m  ╚══════════════════════════════════════════════════════╝\033[0m\n"
+    printf "\n"
+
+    # 操作提示
+    printf "  \033[0;37m↑↓\033[0m 移动光标    \033[0;37m空格\033[0m 选中/取消    \033[0;37ma\033[0m 全选    \033[0;37mEnter\033[0m 确认\033[0m\n"
+    printf "\n"
+
+    # 绘制菜单项
+    for ((i=0; i<total; i++)); do
+        IFS='|' read -r key desc default <<< "${MENU_ITEMS[i]}"
+
+        # 光标高亮背景
+        if [[ ${i} -eq ${MENU_CURSOR} ]]; then
+            printf "\033[1;37;44m  ▸ "
         else
-            echo "${selections[*]}"
+            printf "\033[0m    "
         fi
-        return
-    fi
 
-    # 解析数字选择 (支持逗号、空格、混合分隔)
-    # 将输入中的逗号替换为空格，然后遍历
-    local numbers
-    numbers=$(echo "${input}" | tr ',' ' ')
-
-    for num in ${numbers}; do
-        # 验证是否为数字
-        if [[ ! "${num}" =~ ^[0-9]+$ ]]; then
-            continue
+        # 选中状态 checkbox
+        if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
+            printf "[\033[1;32m✓\033[0m"
+            if [[ ${i} -eq ${MENU_CURSOR} ]]; then
+                printf "\033[1;37;44m"
+            fi
+            printf "] %s" "${desc}"
+        else
+            printf "[ ] %s" "${desc}"
         fi
-        # 验证范围
-        if [[ ${num} -ge 1 && ${num} -le ${total} ]]; then
-            local idx=$((num-1))
-            local key
-            IFS='|' read -r key desc default <<< "${MENU_ITEMS[idx]}"
+
+        # 重置样式并换行
+        printf "\033[0m\n"
+    done
+
+    # 底部统计
+    printf "\n"
+    local selected_count=0
+    for key in "${!MENU_SELECTED[@]}"; do
+        if [[ "${MENU_SELECTED[${key}]}" == "1" ]]; then
+            ((selected_count++))
+        fi
+    done
+    printf "  \033[0;36m已选中: %d 项\033[0m\n" "${selected_count}"
+}
+
+# 主菜单交互循环
+show_interactive_menu() {
+    init_menu_selections
+
+    local total=${#MENU_ITEMS[@]}
+
+    # 首次绘制
+    draw_menu
+
+    # 输入循环
+    while true; do
+        # 读取单个字符
+        local key
+        IFS= read -rsn1 key
+
+        # 检测方向键 (ESC + [ + A/B)
+        if [[ "${key}" == $'\033' ]]; then
+            read -rsn2 key
+            case "${key}" in
+                "[A") # 上
+                    MENU_CURSOR=$(( (MENU_CURSOR - 1 + total) % total ))
+                    ;;
+                "[B") # 下
+                    MENU_CURSOR=$(( (MENU_CURSOR + 1) % total ))
+                    ;;
+                *)
+                    continue
+                    ;;
+            esac
+        elif [[ "${key}" == " " ]]; then
+            # 空格 - 切换选中
+            local current_key
+            IFS='|' read -r current_key desc default <<< "${MENU_ITEMS[MENU_CURSOR]}"
+            if [[ "${MENU_SELECTED[${current_key}]:-0}" == "1" ]]; then
+                MENU_SELECTED["${current_key}"]=0
+            else
+                MENU_SELECTED["${current_key}"]=1
+            fi
+        elif [[ "${key}" == "a" || "${key}" == "A" ]]; then
+            # 全选/全不选
+            local all_selected=true
+            for item in "${MENU_ITEMS[@]}"; do
+                IFS='|' read -r k d df <<< "${item}"
+                if [[ "${MENU_SELECTED[${k}]:-0}" != "1" ]]; then
+                    all_selected=false
+                    break
+                fi
+            done
+            for item in "${MENU_ITEMS[@]}"; do
+                IFS='|' read -r k d df <<< "${item}"
+                if ${all_selected}; then
+                    MENU_SELECTED["${k}"]=0
+                else
+                    MENU_SELECTED["${k}"]=1
+                fi
+            done
+        elif [[ -z "${key}" ]]; then
+            # Enter - 确认
+            break
+        fi
+
+        draw_menu
+    done
+
+    # 恢复光标
+    printf "\033[?25h"
+
+    # 返回选中的项目
+    local selections=()
+    for item in "${MENU_ITEMS[@]}"; do
+        IFS='|' read -r key desc default <<< "${item}"
+        if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
             selections+=("${key}")
         fi
     done
 
-    if [[ ${#selections[@]} -eq 0 ]]; then
-        echo "none"
-    else
-        # 去重
-        printf '%s\n' "${selections[@]}" | sort -u | tr '\n' ' '
-    fi
+    printf "\033[0m\n"
+    echo "${selections[*]}"
 }
 
 # ============================================================================
@@ -919,27 +983,14 @@ main() {
     log_info "更新包索引..."
     pkg_update 2>/dev/null || log_warn "包索引更新失败，继续执行..."
 
-    # 显示菜单
-    show_menu
+    # 交互式菜单选择
+    local selections
+    selections=$(show_interactive_menu)
 
-    # 获取用户选择
-    local selections=""
-    while true; do
-        read -rp "请输入选项 (如 1,3,5 或 a 全部，回车使用默认): " user_input
-        selections=$(parse_selection "${user_input}")
-
-        if [[ "${selections}" == "quit" ]]; then
-            log_info "用户取消，退出"
-            exit 0
-        fi
-
-        if [[ "${selections}" == "none" ]]; then
-            log_warn "未选择任何项目，请重新选择"
-            continue
-        fi
-
-        break
-    done
+    if [[ -z "${selections}" ]]; then
+        log_error "未选择任何项目，退出"
+        exit 1
+    fi
 
     # 确认安装
     echo ""
