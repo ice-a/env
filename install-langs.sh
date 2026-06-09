@@ -2,6 +2,7 @@
 # ============================================================================
 # install-langs.sh — Linux 服务器开发语言自动安装工具
 # 支持: C/C++, Python, Node.js, Go, Java, Rust, Docker, Git, Make
+#       MySQL, MongoDB, Redis
 # 特性: 版本管理工具、国内镜像切换、错误日志、交互式选择菜单
 # ============================================================================
 set -u -o pipefail
@@ -21,7 +22,6 @@ GO_PROXY="https://goproxy.cn,direct"
 NVM_NODE_MIRROR="https://npmmirror.com/mirrors/node"
 CONDA_MIRROR="${MIRROR_TUNA}/anaconda/miniconda"
 RUSTUP_MIRROR="https://mirrors.ustc.edu.cn/rust-static"
-DOCKER_MIRROR="https://mirrors.aliyun.com/docker-ce"
 
 # 检测结果
 OS_ID=""
@@ -40,6 +40,9 @@ declare -a MENU_ITEMS=(
     "java|Java (OpenJDK)|1"
     "rust|Rust (通过 rustup)|1"
     "docker|Docker|1"
+    "mysql|MySQL|0"
+    "mongodb|MongoDB|0"
+    "redis|Redis|0"
     "git|Git|0"
     "make|Make & CMake|0"
 )
@@ -48,19 +51,19 @@ declare -a MENU_ITEMS=(
 # 日志函数
 # ============================================================================
 log_info() {
-    printf "\033[0;32m[INFO]\033[0m  %s\n" "$*"
+    printf "[INFO]  %s\n" "$*"
 }
 
 log_warn() {
-    printf "\033[0;33m[WARN]\033[0m  %s\n" "$*"
+    printf "[WARN]  %s\n" "$*"
 }
 
 log_error() {
-    printf "\033[0;31m[ERROR]\033[0m %s\n" "$*"
+    printf "[ERROR] %s\n" "$*"
 }
 
 log_step() {
-    printf "\n\033[1;34m══════ %s ══════\033[0m\n" "$*"
+    printf "\n══════ %s ══════\n" "$*"
 }
 
 # 写入错误日志
@@ -72,28 +75,10 @@ log_error_to_file() {
 }
 
 # ============================================================================
-# 交互式 TUI 菜单
+# 交互式菜单 (简化版，兼容所有终端)
 # ============================================================================
-# 菜单状态
 declare -A MENU_SELECTED=()
 MENU_CURSOR=0
-
-# 检测终端是否支持颜色
-supports_color() {
-    if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
-        return 0
-    fi
-    return 1
-}
-
-# 清屏
-clear_screen() {
-    if command -v tput &>/dev/null; then
-        tput clear 2>/dev/null || printf "\033[2J\033[H"
-    else
-        printf "\033[2J\033[H"
-    fi
-}
 
 # 初始化默认选中状态
 init_menu_selections() {
@@ -107,24 +92,18 @@ init_menu_selections() {
     done
 }
 
-# 绘制菜单
+# 绘制菜单 (使用 printf，不依赖 tput)
 draw_menu() {
     local total=${#MENU_ITEMS[@]}
 
-    # 清屏
-    clear_screen
+    # 清屏 (兼容方式)
+    printf '\033[2J\033[H'
 
     # 标题
     printf "\n"
-    if supports_color; then
-        printf "\033[1;36m  ╔══════════════════════════════════════════════════════╗\033[0m\n"
-        printf "\033[1;36m  ║        Linux 开发语言自动安装工具                   ║\033[0m\n"
-        printf "\033[1;36m  ╚══════════════════════════════════════════════════════╝\033[0m\n"
-    else
-        printf "  ╔══════════════════════════════════════════════════════╗\n"
-        printf "  ║        Linux 开发语言自动安装工具                   ║\n"
-        printf "  ╚══════════════════════════════════════════════════════╝\n"
-    fi
+    printf "  ╔══════════════════════════════════════════════════════╗\n"
+    printf "  ║        Linux 开发语言自动安装工具                   ║\n"
+    printf "  ╚══════════════════════════════════════════════════════╝\n"
     printf "\n"
 
     # 操作提示
@@ -135,34 +114,19 @@ draw_menu() {
     for ((i=0; i<total; i++)); do
         IFS='|' read -r key desc default <<< "${MENU_ITEMS[i]}"
 
-        # 光标高亮
+        # 光标位置标记
         if [[ ${i} -eq ${MENU_CURSOR} ]]; then
-            if supports_color; then
-                printf "\033[1;37;44m  ▸ "
-            else
-                printf "  > "
-            fi
+            printf "  > "
         else
             printf "    "
         fi
 
         # 选中状态 checkbox
         if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
-            if supports_color; then
-                printf "[\033[1;32m✓\033[0m"
-                if [[ ${i} -eq ${MENU_CURSOR} ]]; then
-                    printf "\033[1;37;44m"
-                fi
-                printf "] %s" "${desc}"
-            else
-                printf "[✓] %s" "${desc}"
-            fi
+            printf "[*] %s\n" "${desc}"
         else
-            printf "[ ] %s" "${desc}"
+            printf "[ ] %s\n" "${desc}"
         fi
-
-        # 重置样式并换行
-        printf "\033[0m\n"
     done
 
     # 底部统计
@@ -174,6 +138,7 @@ draw_menu() {
         fi
     done
     printf "  已选中: %d 项\n" "${selected_count}"
+    printf "\n"
 }
 
 # 主菜单交互循环
@@ -182,27 +147,19 @@ show_interactive_menu() {
 
     local total=${#MENU_ITEMS[@]}
 
-    # 保存当前终端设置并设置为 raw 模式
-    local old_stty
-    old_stty=$(stty -g 2>/dev/null)
-    stty -echo -icanon min 1 time 0 2>/dev/null
-
-    # 退出时恢复终端设置
-    trap 'stty "${old_stty}" 2>/dev/null; printf "\033[?25h\033[0m\n"' EXIT
-
     # 首次绘制
     draw_menu
 
-    # 输入循环
+    # 输入循环 - 使用简单可靠的 read 方式
     while true; do
-        # 读取单个字符
+        # 读取单个字符 (不回显)
         local key
-        IFS= read -rsn1 key
+        read -r -n1 -s key
 
-        # 检测方向键 (ESC + [ + A/B)
+        # 方向键检测: ESC [ A/B
         if [[ "${key}" == $'\033' ]]; then
-            # 读取更多字节
-            read -rsn2 key
+            # 读取后续字节
+            read -r -n2 -s key 2>/dev/null
             case "${key}" in
                 "[A") # 上
                     MENU_CURSOR=$(( (MENU_CURSOR - 1 + total) % total ))
@@ -210,14 +167,11 @@ show_interactive_menu() {
                 "[B") # 下
                     MENU_CURSOR=$(( (MENU_CURSOR + 1) % total ))
                     ;;
-                *)
-                    continue
-                    ;;
             esac
         elif [[ "${key}" == " " ]]; then
             # 空格 - 切换选中
             local current_key
-            IFS='|' read -r current_key desc default <<< "${MENU_ITEMS[MENU_CURSOR]}"
+            IFS='|' read -r current_key _ _ <<< "${MENU_ITEMS[MENU_CURSOR]}"
             if [[ "${MENU_SELECTED[${current_key}]:-0}" == "1" ]]; then
                 MENU_SELECTED["${current_key}"]=0
             else
@@ -227,14 +181,14 @@ show_interactive_menu() {
             # 全选/全不选
             local all_selected=true
             for item in "${MENU_ITEMS[@]}"; do
-                IFS='|' read -r k d df <<< "${item}"
+                IFS='|' read -r k _ _ <<< "${item}"
                 if [[ "${MENU_SELECTED[${k}]:-0}" != "1" ]]; then
                     all_selected=false
                     break
                 fi
             done
             for item in "${MENU_ITEMS[@]}"; do
-                IFS='|' read -r k d df <<< "${item}"
+                IFS='|' read -r k _ _ <<< "${item}"
                 if ${all_selected}; then
                     MENU_SELECTED["${k}"]=0
                 else
@@ -249,21 +203,16 @@ show_interactive_menu() {
         draw_menu
     done
 
-    # 恢复终端设置
-    stty "${old_stty}" 2>/dev/null
-    trap - EXIT
-    printf "\033[?25h"  # 恢复光标
-
     # 返回选中的项目
     local selections=()
     for item in "${MENU_ITEMS[@]}"; do
-        IFS='|' read -r key desc default <<< "${item}"
+        IFS='|' read -r key _ _ <<< "${item}"
         if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
             selections+=("${key}")
         fi
     done
 
-    printf "\033[0m\n"
+    printf "\n"
     echo "${selections[*]}"
 }
 
@@ -324,16 +273,6 @@ get_user_home() {
 # ============================================================================
 # 网络检测与镜像切换
 # ============================================================================
-check_network() {
-    local test_urls=("https://www.google.com" "https://github.com" "${MIRROR_TUNA}")
-    for url in "${test_urls[@]}"; do
-        if curl -sSf --connect-timeout 5 --max-time 10 "${url}" &>/dev/null; then
-            return 0
-        fi
-    done
-    return 1
-}
-
 should_use_mirror() {
     if curl -sSf --connect-timeout 5 --max-time 10 "https://go.dev" &>/dev/null; then
         return 1
@@ -436,22 +375,6 @@ ensure_path_entry() {
     local entry="$1"
     local profile_file="$2"
     append_once "${profile_file}" "export PATH=\"${entry}:\${PATH}\""
-}
-
-ensure_profile_block() {
-    local file="$1" marker="$2"
-    shift 2
-    local content="$*"
-
-    touch "${file}" 2>/dev/null || true
-    if ! grep -qF "# >>> ${marker} >>>" "${file}" 2>/dev/null; then
-        {
-            echo ""
-            echo "# >>> ${marker} >>>"
-            echo "${content}"
-            echo "# <<< ${marker} <<<"
-        } >> "${file}"
-    fi
 }
 
 download_file() {
@@ -602,7 +525,6 @@ install_node() {
     if [[ -d "${nvm_dir}" ]]; then
         log_warn "nvm 已安装于 ${nvm_dir}"
         export NVM_DIR="${nvm_dir}"
-        # shellcheck source=/dev/null
         [ -s "${nvm_dir}/nvm.sh" ] && . "${nvm_dir}/nvm.sh"
         return 0
     fi
@@ -620,7 +542,6 @@ install_node() {
     sudo -u "${REAL_USER}" bash "${installer}" 2>/dev/null
     rm -f "${installer}"
 
-    # shellcheck source=/dev/null
     [ -s "${nvm_dir}/nvm.sh" ] && . "${nvm_dir}/nvm.sh"
 
     log_info "安装 Node.js LTS..."
@@ -773,13 +694,11 @@ install_rust() {
     user_home="$(get_user_home)"
     local cargo_dir="${user_home}/.cargo"
 
-    # 检查是否已安装
     if [[ -f "${cargo_dir}/bin/rustc" ]]; then
         log_warn "Rust 已安装于 ${cargo_dir}，跳过"
         return 0
     fi
 
-    # 设置国内镜像
     export RUSTUP_DIST_SERVER="${RUSTUP_MIRROR}"
     export RUSTUP_UPDATE_ROOT="${RUSTUP_MIRROR}/rustup"
 
@@ -790,7 +709,6 @@ install_rust() {
     fi
 
     log_info "安装 Rust..."
-    # 以真实用户身份安装，静默模式
     sudo -u "${REAL_USER}" RUSTUP_DIST_SERVER="${RUSTUP_MIRROR}" \
         RUSTUP_UPDATE_ROOT="${RUSTUP_MIRROR}/rustup" \
         bash "${installer}" -y --default-toolchain stable 2>/dev/null
@@ -808,7 +726,6 @@ registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
 EOF
     chown -R "${REAL_USER}:${REAL_USER}" "${cargo_dir}" 2>/dev/null || true
 
-    # 确保 PATH 包含 cargo
     local user_profile="${user_home}/.bashrc"
     ensure_path_entry '${HOME}/.cargo/bin' "${user_profile}"
     chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
@@ -828,24 +745,20 @@ verify_rust() {
 install_docker() {
     log_step "安装 Docker"
 
-    # 检查是否已安装
     if command -v docker &>/dev/null; then
         log_warn "Docker 已安装，跳过"
         return 0
     fi
 
-    # 安装依赖
     case "${PKG_MGR}" in
         apt)
             pkg_install ca-certificates curl gnupg lsb-release
-            # 添加 Docker GPG key
             local keyring="/etc/apt/keyrings/docker.gpg"
             mkdir -p /etc/apt/keyrings
             if [[ ! -f "${keyring}" ]]; then
                 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o "${keyring}" 2>/dev/null
                 chmod a+r "${keyring}"
             fi
-            # 添加仓库
             local codename
             codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
             echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://download.docker.com/linux/ubuntu ${codename} stable" \
@@ -861,17 +774,13 @@ install_docker() {
             ;;
     esac
 
-    # 启动 Docker
     systemctl start docker 2>/dev/null || true
     systemctl enable docker 2>/dev/null || true
-
-    # 将当前用户加入 docker 组
     usermod -aG docker "${REAL_USER}" 2>/dev/null || true
 
     # 配置 Docker 国内镜像
-    local daemon_json="/etc/docker/daemon.json"
     mkdir -p /etc/docker
-    cat > "${daemon_json}" <<EOF
+    cat > /etc/docker/daemon.json <<EOF
 {
   "registry-mirrors": [
     "https://docker.mirrors.ustc.edu.cn",
@@ -881,7 +790,6 @@ install_docker() {
 }
 EOF
 
-    # 重启 Docker 使配置生效
     systemctl restart docker 2>/dev/null || true
 
     log_info "Docker 安装完成，已配置国内镜像加速"
@@ -893,30 +801,160 @@ verify_docker() {
 }
 
 # ============================================================================
+# 安装函数: MySQL
+# ============================================================================
+install_mysql() {
+    log_step "安装 MySQL"
+
+    case "${PKG_MGR}" in
+        apt)
+            # 设置 MySQL APT 仓库
+            local mysql_deb="/tmp/mysql-apt-config.deb"
+            if ! download_file "https://dev.mysql.com/get/mysql-apt-config_0.8.30-1_all.deb" "${mysql_deb}"; then
+                log_warn "下载 MySQL APT 配置失败，使用系统默认版本"
+                pkg_install mysql-server mysql-client
+            else
+                DEBIAN_FRONTEND=noninteractive dpkg -i "${mysql_deb}" 2>/dev/null
+                rm -f "${mysql_deb}"
+                pkg_update
+                pkg_install mysql-server mysql-client
+            fi
+            ;;
+        dnf|yum)
+            # 添加 MySQL 仓库
+            local mysql_rpm="/tmp/mysql80-community-release.rpm"
+            if ! download_file "https://dev.mysql.com/get/mysql80-community-release-el8-9.noarch.rpm" "${mysql_rpm}"; then
+                log_warn "下载 MySQL 仓库配置失败，使用 MariaDB 替代"
+                pkg_install mariadb-server mariadb
+            else
+                rpm -ivh "${mysql_rpm}" 2>/dev/null
+                rm -f "${mysql_rpm}"
+                # 禁用默认 MySQL 模块，启用 8.0
+                dnf module disable mysql -y 2>/dev/null || true
+                pkg_install mysql-community-server mysql-community-client
+            fi
+            ;;
+    esac
+
+    # 启动 MySQL
+    systemctl start mysql 2>/dev/null || systemctl start mysqld 2>/dev/null || true
+    systemctl enable mysql 2>/dev/null || systemctl enable mysqld 2>/dev/null || true
+
+    # 安全配置提示
+    log_info "MySQL 安装完成"
+    log_warn "请运行 'mysql_secure_installation' 进行安全配置"
+    log_warn "首次登录密码请查看: /var/log/mysqld.log 或使用 sudo mysql"
+}
+
+verify_mysql() {
+    command -v mysql &>/dev/null
+}
+
+# ============================================================================
+# 安装函数: MongoDB
+# ============================================================================
+install_mongodb() {
+    log_step "安装 MongoDB"
+
+    case "${PKG_MGR}" in
+        apt)
+            # 导入 MongoDB GPG key
+            curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
+                gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg 2>/dev/null
+
+            # 添加仓库
+            local codename
+            codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
+            echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${codename}/mongodb-org/7.0 multiverse" \
+                > /etc/apt/sources.list.d/mongodb-org-7.0.list
+
+            pkg_update
+            pkg_install mongodb-org
+            ;;
+        dnf|yum)
+            cat > /etc/yum.repos.d/mongodb-org-7.0.repo <<'EOF'
+[mongodb-org-7.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/7.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
+EOF
+            pkg_install mongodb-org
+            ;;
+    esac
+
+    # 启动 MongoDB
+    systemctl start mongod 2>/dev/null || true
+    systemctl enable mongod 2>/dev/null || true
+
+    # 配置 MongoDB 国内镜像 (用于工具安装)
+    append_once "$(get_user_home)/.bashrc" 'export MONGODB_TOOLS_REPO="https://mirrors.tuna.tsinghua.edu.cn/mongodb"'
+
+    log_info "MongoDB 7.0 安装完成"
+    log_warn "MongoDB 默认无需密码，生产环境请配置认证"
+}
+
+verify_mongodb() {
+    command -v mongod &>/dev/null || command -v mongosh &>/dev/null
+}
+
+# ============================================================================
+# 安装函数: Redis
+# ============================================================================
+install_redis() {
+    log_step "安装 Redis"
+
+    case "${PKG_MGR}" in
+        apt)
+            # 添加 Redis 仓库
+            curl -fsSL https://packages.redis.io/gpg | \
+                gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg 2>/dev/null
+            echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" \
+                > /etc/apt/sources.list.d/redis.list
+            pkg_update
+            pkg_install redis
+            ;;
+        dnf|yum)
+            pkg_install epel-release 2>/dev/null || true
+            pkg_install redis
+            ;;
+    esac
+
+    # 启动 Redis
+    systemctl start redis 2>/dev/null || systemctl start redis-server 2>/dev/null || true
+    systemctl enable redis 2>/dev/null || systemctl enable redis-server 2>/dev/null || true
+
+    # 配置 Redis 国内镜像 (用于客户端库)
+    append_once "$(get_user_home)/.bashrc" 'export REDIS_CLIENT_REPO="https://mirrors.tuna.tsinghua.edu.cn/redis"'
+
+    log_info "Redis 安装完成"
+    log_warn "Redis 默认监听 127.0.0.1:6379，生产环境请配置密码"
+}
+
+verify_redis() {
+    command -v redis-server &>/dev/null || command -v redis-cli &>/dev/null
+}
+
+# ============================================================================
 # 安装函数: Git
 # ============================================================================
 install_git() {
     log_step "安装 Git"
 
     case "${PKG_MGR}" in
-        apt)
-            pkg_install git git-lfs
-            ;;
-        dnf|yum)
+        apt|dnf|yum)
             pkg_install git git-lfs
             ;;
     esac
 
-    # 基础配置
     local user_home
     user_home="$(get_user_home)"
     local gitconfig="${user_home}/.gitconfig"
 
-    # 只在未配置时设置
     if [[ ! -f "${gitconfig}" ]] || ! grep -q "\[user\]" "${gitconfig}" 2>/dev/null; then
         sudo -u "${REAL_USER}" git config --global init.defaultBranch main
         sudo -u "${REAL_USER}" git config --global core.autocrlf input
-        sudo -u "${REAL_USER}" git config --global core.editor vim
     fi
 
     log_info "Git 安装完成"
@@ -933,10 +971,7 @@ install_make() {
     log_step "安装 Make & CMake"
 
     case "${PKG_MGR}" in
-        apt)
-            pkg_install make cmake autoconf automake libtool
-            ;;
-        dnf|yum)
+        apt|dnf|yum)
             pkg_install make cmake autoconf automake libtool
             ;;
     esac
@@ -981,7 +1016,7 @@ run_language_step() {
 # ============================================================================
 main() {
     echo ""
-    log_info "Linux 开发语言自动安装工具 v2.0"
+    log_info "Linux 开发语言自动安装工具 v2.1"
     echo ""
 
     # 系统检测
@@ -1055,76 +1090,40 @@ main() {
         ((total++))
         case "${lang}" in
             cpp)
-                if run_language_step "C/C++" install_cpp verify_cpp; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("C/C++")
-                fi
+                if run_language_step "C/C++" install_cpp verify_cpp; then ((success++)); else ((failed++)); failed_list+=("C/C++"); fi
                 ;;
             python)
-                if run_language_step "Python" install_python verify_python; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Python")
-                fi
+                if run_language_step "Python" install_python verify_python; then ((success++)); else ((failed++)); failed_list+=("Python"); fi
                 ;;
             node)
-                if run_language_step "Node.js" install_node verify_node; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Node.js")
-                fi
+                if run_language_step "Node.js" install_node verify_node; then ((success++)); else ((failed++)); failed_list+=("Node.js"); fi
                 ;;
             go)
-                if run_language_step "Go" install_go verify_go; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Go")
-                fi
+                if run_language_step "Go" install_go verify_go; then ((success++)); else ((failed++)); failed_list+=("Go"); fi
                 ;;
             java)
-                if run_language_step "Java" install_java verify_java; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Java")
-                fi
+                if run_language_step "Java" install_java verify_java; then ((success++)); else ((failed++)); failed_list+=("Java"); fi
                 ;;
             rust)
-                if run_language_step "Rust" install_rust verify_rust; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Rust")
-                fi
+                if run_language_step "Rust" install_rust verify_rust; then ((success++)); else ((failed++)); failed_list+=("Rust"); fi
                 ;;
             docker)
-                if run_language_step "Docker" install_docker verify_docker; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Docker")
-                fi
+                if run_language_step "Docker" install_docker verify_docker; then ((success++)); else ((failed++)); failed_list+=("Docker"); fi
+                ;;
+            mysql)
+                if run_language_step "MySQL" install_mysql verify_mysql; then ((success++)); else ((failed++)); failed_list+=("MySQL"); fi
+                ;;
+            mongodb)
+                if run_language_step "MongoDB" install_mongodb verify_mongodb; then ((success++)); else ((failed++)); failed_list+=("MongoDB"); fi
+                ;;
+            redis)
+                if run_language_step "Redis" install_redis verify_redis; then ((success++)); else ((failed++)); failed_list+=("Redis"); fi
                 ;;
             git)
-                if run_language_step "Git" install_git verify_git; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Git")
-                fi
+                if run_language_step "Git" install_git verify_git; then ((success++)); else ((failed++)); failed_list+=("Git"); fi
                 ;;
             make)
-                if run_language_step "Make & CMake" install_make verify_make; then
-                    ((success++))
-                else
-                    ((failed++))
-                    failed_list+=("Make & CMake")
-                fi
+                if run_language_step "Make & CMake" install_make verify_make; then ((success++)); else ((failed++)); failed_list+=("Make & CMake"); fi
                 ;;
         esac
     done

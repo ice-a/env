@@ -4,20 +4,26 @@ Linux 服务器开发语言自动安装工具。
 
 ## 功能
 
-- 交互式空格选中菜单（↑↓ 移动，空格选中，Enter 确认）
+- 交互式菜单选择（↑↓ 移动，空格选中，Enter 确认）
 - 支持安装：
-  - C/C++ (gcc, g++, make, cmake)
-  - Python (系统版本 或 Miniconda)
-  - Node.js (通过 nvm)
-  - Go
-  - Java (OpenJDK)
-  - Rust (通过 rustup)
-  - Docker
-  - Git
-  - Make & CMake
-- 国内镜像源自动切换
-- 错误日志记录到 `error.log`
-- 幂等性设计，重复运行安全
+
+### 开发语言
+- C/C++ (gcc, g++, make, cmake)
+- Python (系统版本 或 Miniconda)
+- Node.js (通过 nvm)
+- Go
+- Java (OpenJDK)
+- Rust (通过 rustup)
+
+### 数据库
+- MySQL
+- MongoDB
+- Redis
+
+### 工具
+- Docker
+- Git
+- Make & CMake
 
 ## 使用
 
