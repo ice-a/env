@@ -1,0 +1,12 @@
+{
+  "id": "lang-installer",
+  "title": "Linux 服务器自动安装语言的 shell 工具",
+  "status": "completed",
+  "strategy": "guided-develop",
+  "currentPhase": "6-verify",
+  "nextAction": "实施完成",
+  "gate": null,
+  "gate": null,
+  "scope": "lang-installer",
+  "createdAt": "2026-06-09T09:05:00Z"
+}
