@@ -4,8 +4,8 @@ Linux 服务器开发环境一键安装工具。
 
 ## 功能特性
 
-- 🖱️ **交互式 TUI 菜单** — 方向键移动、空格选中、Enter 确认
-- 📦 **一站式安装** — 开发语言 + 数据库 + 工具链
+- **交互式 TUI 菜单** — 方向键移动、空格选中、Enter 确认
+- **一站式安装/卸载** — 开发语言 + 数据库 + 工具链 + 版本管理工具
 - 🚀 **国内镜像加速** — 所有包管理器默认使用国内镜像
 - 📝 **错误日志** — 安装失败自动记录到 `error.log`
 - 🔒 **安全兼容** — 支持 `sudo` 环境，自动检测真实用户
@@ -16,8 +16,8 @@ Linux 服务器开发环境一键安装工具。
 | 语言 | 安装方式 | 说明 |
 |------|---------|------|
 | C/C++ | 系统包管理器 | gcc, g++, make, cmake |
-| Python | 系统 Python 或 Miniconda | 双模式可选 |
-| Node.js | nvm | 支持多版本切换 |
+| Python | 系统 Python 或 Miniforge | 双模式可选 |
+| JavaScript / Node.js | nvm | 支持多版本切换 |
 | Go | 官方二进制 | 配置 goproxy.cn |
 | Java | OpenJDK | 系统包管理器 |
 | Rust | rustup | 配置 USTC 镜像 |
@@ -27,10 +27,13 @@ Linux 服务器开发环境一键安装工具。
 - MongoDB
 - Redis
 
-### 工具链
+### 工具链 / 管理工具
 - Docker
 - Git
 - Make & CMake
+- nvm
+- g
+- Miniforge
 
 ## 快速开始
 
@@ -40,10 +43,13 @@ git clone https://github.com/ice-a/env.git
 cd env
 
 # 2. 添加执行权限
-chmod +x install-langs.sh
+chmod +x dev-env.sh
 
 # 3. 执行安装（需要 root 权限）
-sudo ./install-langs.sh
+sudo ./dev-env.sh
+
+# 卸载（进入同样的交互菜单选择项目）
+sudo ./dev-env.sh --uninstall
 ```
 
 ## 菜单操作
@@ -53,7 +59,7 @@ sudo ./install-langs.sh
 | ↑ ↓ | 移动光标 |
 | 空格 | 选中/取消选中 |
 | a / A | 全选 / 全不选 |
-| Enter | 确认安装 |
+| Enter | 确认安装/卸载 |
 
 ## 支持系统
 
@@ -72,7 +78,7 @@ sudo ./install-langs.sh
 | npm | npmmirror |
 | Go | goproxy.cn |
 | nvm Node | npmmirror |
-| Miniconda | 清华 TUNA |
+| Miniforge | GitHub conda-forge/miniforge Releases，失败后使用清华 GitHub Release 镜像 |
 | Rust / crates.io | USTC |
 | Docker | USTC / 163 / 腾讯云 |
 
