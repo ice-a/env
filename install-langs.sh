@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 # ============================================================================
-# install-langs.sh — Linux 服务器开发语言自动安装工具
+# install-langs.sh — Linux 服务器开发环境自动安装工具
 # 支持: C/C++, Python, Node.js, Go, Java, Rust, Docker, Git, Make
 #       MySQL, MongoDB, Redis
-# 特性: 版本管理工具、国内镜像切换、错误日志、交互式选择菜单
+# 特性: 数字选择、命令行参数、国内镜像、错误日志
 # ============================================================================
 set -u -o pipefail
 
-# ============================================================================
-# 全局变量
-# ============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ERROR_LOG="${SCRIPT_DIR}/error.log"
 TIMESTAMP_FORMAT="%Y-%m-%dT%H:%M:%S%z"
@@ -20,10 +17,9 @@ MIRROR_ALIYUN="https://mirrors.aliyun.com"
 NPM_MIRROR="https://registry.npmmirror.com"
 GO_PROXY="https://goproxy.cn,direct"
 NVM_NODE_MIRROR="https://npmmirror.com/mirrors/node"
-CONDA_MIRROR="${MIRROR_TUNA}/anaconda/miniconda"
+CONDA_MIRROR="https://github.com/conda-forge/miniforge/releases/latest/download"
 RUSTUP_MIRROR="https://mirrors.ustc.edu.cn/rust-static"
 
-# 检测结果
 OS_ID=""
 OS_VERSION=""
 PKG_MGR=""
@@ -31,42 +27,26 @@ ARCH=""
 REAL_USER=""
 IS_ROOT=false
 
-# 菜单项定义: key|描述|默认选中(1=是,0=否)
 declare -a MENU_ITEMS=(
-    "cpp|C/C++ (gcc, g++, make, cmake)|1"
-    "python|Python (系统版本 或 Miniconda)|1"
-    "node|Node.js (通过 nvm)|1"
-    "go|Go|1"
-    "java|Java (OpenJDK)|1"
-    "rust|Rust (通过 rustup)|1"
-    "docker|Docker|1"
-    "mysql|MySQL|0"
-    "mongodb|MongoDB|0"
-    "redis|Redis|0"
-    "git|Git|0"
-    "make|Make & CMake|0"
+    "cpp|C/C++ (gcc, g++, make, cmake)"
+    "python|Python (Miniforge)"
+    "node|Node.js (通过 nvm)"
+    "go|Go"
+    "java|Java (OpenJDK)"
+    "rust|Rust (通过 rustup)"
+    "docker|Docker"
+    "mysql|MySQL"
+    "mongodb|MongoDB"
+    "redis|Redis"
+    "git|Git"
+    "make|Make & CMake"
 )
 
-# ============================================================================
-# 日志函数
-# ============================================================================
-log_info() {
-    printf "[INFO]  %s\n" "$*"
-}
+log_info() { printf "[INFO]  %s\n" "$*"; }
+log_warn() { printf "[WARN]  %s\n" "$*"; }
+log_error() { printf "[ERROR] %s\n" "$*"; }
+log_step() { printf "\n══════ %s ══════\n" "$*"; }
 
-log_warn() {
-    printf "[WARN]  %s\n" "$*"
-}
-
-log_error() {
-    printf "[ERROR] %s\n" "$*"
-}
-
-log_step() {
-    printf "\n══════ %s ══════\n" "$*"
-}
-
-# 写入错误日志
 log_error_to_file() {
     local lang="$1" phase="$2" exit_code="$3" msg="$4"
     local ts
@@ -74,158 +54,8 @@ log_error_to_file() {
     echo "${ts} level=ERROR lang=${lang} phase=${phase} exit=${exit_code} msg=\"${msg}\"" >> "${ERROR_LOG}"
 }
 
-# ============================================================================
-# 交互式菜单 (简化版，兼容所有终端)
-# ============================================================================
-declare -A MENU_SELECTED=()
-MENU_CURSOR=0
-
-# 初始化默认选中状态
-init_menu_selections() {
-    for item in "${MENU_ITEMS[@]}"; do
-        IFS='|' read -r key desc default <<< "${item}"
-        if [[ "${default}" == "1" ]]; then
-            MENU_SELECTED["${key}"]=1
-        else
-            MENU_SELECTED["${key}"]=0
-        fi
-    done
-}
-
-# 绘制菜单 (使用 printf，不依赖 tput)
-draw_menu() {
-    local total=${#MENU_ITEMS[@]}
-
-    # 清屏 (兼容方式)
-    printf '\033[2J\033[H'
-
-    # 标题
-    printf "\n"
-    printf "  ╔══════════════════════════════════════════════════════╗\n"
-    printf "  ║        Linux 开发语言自动安装工具                   ║\n"
-    printf "  ╚══════════════════════════════════════════════════════╝\n"
-    printf "\n"
-
-    # 操作提示
-    printf "  ↑↓ 移动光标    空格 选中/取消    a 全选    Enter 确认\n"
-    printf "\n"
-
-    # 绘制菜单项
-    for ((i=0; i<total; i++)); do
-        IFS='|' read -r key desc default <<< "${MENU_ITEMS[i]}"
-
-        # 光标位置标记
-        if [[ ${i} -eq ${MENU_CURSOR} ]]; then
-            printf "  > "
-        else
-            printf "    "
-        fi
-
-        # 选中状态 checkbox
-        if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
-            printf "[*] %s\n" "${desc}"
-        else
-            printf "[ ] %s\n" "${desc}"
-        fi
-    done
-
-    # 底部统计
-    printf "\n"
-    local selected_count=0
-    for key in "${!MENU_SELECTED[@]}"; do
-        if [[ "${MENU_SELECTED[${key}]}" == "1" ]]; then
-            ((selected_count++))
-        fi
-    done
-    printf "  已选中: %d 项\n" "${selected_count}"
-    printf "\n"
-}
-
-# 主菜单交互循环
-show_interactive_menu() {
-    init_menu_selections
-
-    local total=${#MENU_ITEMS[@]}
-
-    # 首次绘制
-    draw_menu
-
-    # 输入循环 - 兼容 Linux 终端
-    while true; do
-        # 读取单个字符 (不回显，带超时)
-        local key
-        if ! read -r -s -n1 -t 1 key; then
-            # 超时或无输入，继续循环
-            continue
-        fi
-
-        # 方向键检测: ESC 序列
-        if [[ "${key}" == $'\033' ]]; then
-            # 读取后续 2 字符 (带短超时)
-            local rest
-            read -r -s -n2 -t 0.1 rest 2>/dev/null || true
-            case "${rest}" in
-                "[A") # 上
-                    MENU_CURSOR=$(( (MENU_CURSOR - 1 + total) % total ))
-                    ;;
-                "[B") # 下
-                    MENU_CURSOR=$(( (MENU_CURSOR + 1) % total ))
-                    ;;
-            esac
-        elif [[ "${key}" == " " ]]; then
-            # 空格 - 切换选中
-            local current_key
-            IFS='|' read -r current_key _ _ <<< "${MENU_ITEMS[MENU_CURSOR]}"
-            if [[ "${MENU_SELECTED[${current_key}]:-0}" == "1" ]]; then
-                MENU_SELECTED["${current_key}"]=0
-            else
-                MENU_SELECTED["${current_key}"]=1
-            fi
-        elif [[ "${key}" == "a" || "${key}" == "A" ]]; then
-            # 全选/全不选
-            local all_selected=true
-            for item in "${MENU_ITEMS[@]}"; do
-                IFS='|' read -r k _ _ <<< "${item}"
-                if [[ "${MENU_SELECTED[${k}]:-0}" != "1" ]]; then
-                    all_selected=false
-                    break
-                fi
-            done
-            for item in "${MENU_ITEMS[@]}"; do
-                IFS='|' read -r k _ _ <<< "${item}"
-                if ${all_selected}; then
-                    MENU_SELECTED["${k}"]=0
-                else
-                    MENU_SELECTED["${k}"]=1
-                fi
-            done
-        elif [[ "${key}" == $'\n' || -z "${key}" ]]; then
-            # Enter - 确认
-            break
-        fi
-
-        draw_menu
-    done
-
-    # 返回选中的项目
-    local selections=()
-    for item in "${MENU_ITEMS[@]}"; do
-        IFS='|' read -r key _ _ <<< "${item}"
-        if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
-            selections+=("${key}")
-        fi
-    done
-
-    printf "\n"
-    echo "${selections[*]}"
-}
-
-# ============================================================================
-# 系统检测
-# ============================================================================
 detect_os() {
     if [[ -f /etc/os-release ]]; then
-        # shellcheck source=/dev/null
         . /etc/os-release
         OS_ID="${ID:-unknown}"
         OS_VERSION="${VERSION_ID:-unknown}"
@@ -238,765 +68,263 @@ detect_os() {
     fi
 
     case "${OS_ID}" in
-        ubuntu|debian|linuxmint|pop)
-            PKG_MGR="apt" ;;
+        ubuntu|debian|linuxmint|pop) PKG_MGR="apt" ;;
         centos|rhel|rocky|almalinux|fedora)
-            if command -v dnf &>/dev/null; then
-                PKG_MGR="dnf"
-            else
-                PKG_MGR="yum"
-            fi ;;
-        *)
-            PKG_MGR="unknown" ;;
+            if command -v dnf &>/dev/null; then PKG_MGR="dnf"; else PKG_MGR="yum"; fi ;;
+        *) PKG_MGR="unknown" ;;
     esac
-
     ARCH="$(uname -m)"
-    case "${ARCH}" in
-        x86_64|amd64)  ARCH="amd64" ;;
-        aarch64|arm64) ARCH="arm64" ;;
-        *)             ARCH="unknown" ;;
-    esac
 }
 
 detect_real_user() {
     if [[ -n "${SUDO_USER:-}" ]]; then
         REAL_USER="${SUDO_USER}"
+        IS_ROOT=true
+    elif [[ "$(id -u)" -eq 0 ]]; then
+        REAL_USER="root"
+        IS_ROOT=true
     else
         REAL_USER="$(whoami)"
-    fi
-
-    if [[ "$(id -u)" -eq 0 ]]; then
-        IS_ROOT=true
+        IS_ROOT=false
     fi
 }
 
 get_user_home() {
-    eval echo "~${REAL_USER}"
+    if [[ "${REAL_USER}" == "root" ]]; then echo "/root"; else getent passwd "${REAL_USER}" | cut -d: -f6; fi
 }
 
-# ============================================================================
-# 网络检测与镜像切换
-# ============================================================================
-should_use_mirror() {
-    if curl -sSf --connect-timeout 5 --max-time 10 "https://go.dev" &>/dev/null; then
-        return 1
-    fi
-    return 0
-}
-
-switch_apt_mirror() {
-    local mirror_url="${MIRROR_TUNA}/ubuntu"
-    local sources_list="/etc/apt/sources.list"
-    local backup="${sources_list}.bak.$(date +%s)"
-
-    if grep -q "mirrors.tuna.tsinghua.edu.cn" "${sources_list}" 2>/dev/null; then
-        log_info "APT 已使用清华镜像源"
-        return 0
-    fi
-
-    log_info "切换 APT 到清华镜像源..."
-    cp "${sources_list}" "${backup}"
-
-    local codename
-    codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
-
-    cat > "${sources_list}" <<EOF
-# 清华大学镜像源 (auto-generated by install-langs.sh)
-deb ${mirror_url} ${codename} main restricted universe multiverse
-deb ${mirror_url} ${codename}-updates main restricted universe multiverse
-deb ${mirror_url} ${codename}-backports main restricted universe multiverse
-deb ${mirror_url} ${codename}-security main restricted universe multiverse
-EOF
-
-    if ! pkg_update 2>/dev/null; then
-        log_warn "镜像源更新失败，恢复原始源..."
-        cp "${backup}" "${sources_list}"
-        pkg_update 2>/dev/null
-        return 1
-    fi
-}
-
-switch_yum_mirror() {
-    local repo_dir="/etc/yum.repos.d"
-    local backup_dir="${repo_dir}.bak.$(date +%s)"
-
-    if ls "${repo_dir}"/*.repo &>/dev/null && grep -ql "mirrors.aliyun.com" "${repo_dir}"/*.repo 2>/dev/null; then
-        log_info "YUM/DNF 已使用阿里云镜像源"
-        return 0
-    fi
-
-    log_info "切换 YUM/DNF 到阿里云镜像源..."
-    cp -r "${repo_dir}" "${backup_dir}"
-
-    for repo_file in "${repo_dir}"/*.repo; do
-        [[ -f "${repo_file}" ]] || continue
-        sed -i 's|mirrorlist=|#mirrorlist=|g' "${repo_file}"
-        sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://mirrors.aliyun.com|g' "${repo_file}"
-    done
-
-    if ! pkg_update 2>/dev/null; then
-        log_warn "镜像源更新失败，恢复原始源..."
-        rm -rf "${repo_dir}"
-        mv "${backup_dir}" "${repo_dir}"
-        return 1
-    fi
-}
-
-# ============================================================================
-# 包管理器抽象
-# ============================================================================
 pkg_update() {
     case "${PKG_MGR}" in
         apt) apt-get update -y ;;
-        dnf) dnf makecache -y ;;
-        yum) yum makecache -y ;;
-        *)   log_error "不支持的包管理器: ${PKG_MGR}"; return 1 ;;
+        dnf|yum) dnf check-update -y 2>/dev/null || true ;;
     esac
 }
 
 pkg_install() {
-    local packages=("$@")
     case "${PKG_MGR}" in
-        apt) apt-get install -y "${packages[@]}" ;;
-        dnf) dnf install -y "${packages[@]}" ;;
-        yum) yum install -y "${packages[@]}" ;;
-        *)   log_error "不支持的包管理器: ${PKG_MGR}"; return 1 ;;
+        apt) apt-get install -y "$@" ;;
+        dnf) dnf install -y "$@" ;;
+        yum) yum install -y "$@" ;;
     esac
 }
 
-# ============================================================================
-# 环境变量工具
-# ============================================================================
-append_once() {
-    local file="$1" line="$2"
-    touch "${file}" 2>/dev/null || true
-    if ! grep -qF "${line}" "${file}" 2>/dev/null; then
-        echo "${line}" >> "${file}"
+should_use_mirror() {
+    ! curl -s --connect-timeout 5 https://www.google.com &>/dev/null
+}
+
+switch_apt_mirror() {
+    log_info "切换 APT 镜像源到清华 TUNA..."
+    local sources="/etc/apt/sources.list"
+    if [[ -f "${sources}" ]]; then
+        cp "${sources}" "${sources}.bak"
+        sed -i "s|http://archive.ubuntu.com|${MIRROR_TUNA}|g" "${sources}"
+        sed -i "s|http://security.ubuntu.com|${MIRROR_TUNA}|g" "${sources}"
+        apt-get update -y
     fi
 }
 
-ensure_path_entry() {
-    local entry="$1"
-    local profile_file="$2"
-    append_once "${profile_file}" "export PATH=\"${entry}:\${PATH}\""
+switch_yum_mirror() {
+    log_info "切换 YUM/DNF 镜像源到阿里云..."
+    if [[ "${PKG_MGR}" == "dnf" ]]; then
+        dnf config-manager --set-disabled base 2>/dev/null || true
+        dnf config-manager --add-repo "${MIRROR_ALIYUN}/centos/8/BaseOS/x86_64/os/" 2>/dev/null || true
+    fi
 }
 
-download_file() {
-    local url="$1" output="$2"
-    local retries=2
-
-    for ((i=1; i<=retries; i++)); do
-        if curl -fsSL --connect-timeout 10 --max-time 300 -o "${output}" "${url}"; then
-            return 0
-        fi
-        log_warn "下载失败 (尝试 ${i}/${retries}): ${url}"
-        sleep 2
-    done
-
-    return 1
-}
-
-# ============================================================================
-# 安装函数: C/C++
-# ============================================================================
 install_cpp() {
-    log_step "安装 C/C++ 开发环境"
-
-    case "${PKG_MGR}" in
-        apt)
-            pkg_install build-essential gcc g++ make gdb pkg-config cmake
-            ;;
-        dnf|yum)
-            if dnf groupinstall -y "Development Tools" 2>/dev/null || \
-               yum groupinstall -y "Development Tools" 2>/dev/null; then
-                pkg_install gcc gcc-c++ make gdb cmake
-            fi
-            ;;
-    esac
+    log_step "安装 C/C++"
+    pkg_install gcc g++ gcc-c++ make cmake
+    log_info "C/C++ 安装完成"
 }
-
-verify_cpp() {
-    command -v gcc &>/dev/null && command -v g++ &>/dev/null && command -v make &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: Python
-# ============================================================================
-install_python_system() {
-    log_step "安装 Python (系统版本)"
-
-    case "${PKG_MGR}" in
-        apt)
-            pkg_install python3 python3-pip python3-venv python3-dev
-            ;;
-        dnf|yum)
-            pkg_install python3 python3-pip python3-devel
-            ;;
-    esac
-
-    # 配置 PyPI 国内镜像
-    local user_home
-    user_home="$(get_user_home)"
-    local pip_conf="${user_home}/.config/pip/pip.conf"
-    mkdir -p "$(dirname "${pip_conf}")"
-    cat > "${pip_conf}" <<EOF
-[global]
-index-url = ${MIRROR_TUNA}/pypi/web/simple
-trusted-host = mirrors.tuna.tsinghua.edu.cn
-EOF
-    chown "${REAL_USER}:${REAL_USER}" "${pip_conf}" 2>/dev/null || true
-    log_info "已配置 PyPI 清华镜像源"
-}
-
-install_miniconda() {
-    log_step "安装 Miniconda"
-
-    local user_home
-    user_home="$(get_user_home)"
-    local install_dir="${user_home}/miniconda3"
-    local installer="/tmp/miniconda.sh"
-
-    if [[ -d "${install_dir}" ]]; then
-        log_warn "Miniconda 已安装于 ${install_dir}，跳过"
-        return 0
-    fi
-
-    local url="${CONDA_MIRROR}/Miniconda3-latest-Linux-${ARCH}.sh"
-    if ! download_file "${url}" "${installer}"; then
-        log_error "Miniconda 下载失败"
-        return 1
-    fi
-
-    log_info "安装 Miniconda 到 ${install_dir}..."
-    if ! bash "${installer}" -b -p "${install_dir}"; then
-        log_error "Miniconda 安装失败"
-        rm -f "${installer}"
-        return 1
-    fi
-    rm -f "${installer}"
-
-    # 配置 Conda 国内镜像
-    local condarc="${user_home}/.condarc"
-    cat > "${condarc}" <<EOF
-channels:
-  - defaults
-show_channel_urls: true
-default_channels:
-  - ${MIRROR_TUNA}/anaconda/pkgs/main
-  - ${MIRROR_TUNA}/anaconda/pkgs/r
-  - ${MIRROR_TUNA}/anaconda/pkgs/msys2
-custom_channels:
-  conda-forge: ${MIRROR_TUNA}/anaconda/cloud
-  pytorch: ${MIRROR_TUNA}/anaconda/cloud
-EOF
-    chown "${REAL_USER}:${REAL_USER}" "${condarc}" 2>/dev/null || true
-
-    sudo -u "${REAL_USER}" "${install_dir}/bin/conda" init bash 2>/dev/null || true
-
-    log_info "Miniconda 安装完成，已配置清华镜像源"
-}
+verify_cpp() { command -v gcc &>/dev/null && command -v g++ &>/dev/null; }
 
 install_python() {
-    echo ""
-    echo "  Python 安装选项:"
-    echo "    1) 系统 Python + pip（推荐）"
-    echo "    2) Miniconda（版本管理）"
-    echo ""
-    read -rp "  请选择 [1/2，默认 1]: " choice
-    choice="${choice:-1}"
+    log_step "安装 Python (Miniforge)"
+    local user_home="$(get_user_home)"
+    local install_dir="${user_home}/miniforge3"
+    local installer="/tmp/miniforge.sh"
 
-    case "${choice}" in
-        1) install_python_system ;;
-        2) install_miniconda ;;
-        *) log_warn "无效选择，使用系统 Python"; install_python_system ;;
-    esac
-}
-
-verify_python() {
-    command -v python3 &>/dev/null || command -v conda &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: Node.js
-# ============================================================================
-install_node() {
-    log_step "安装 nvm + Node.js"
-
-    local user_home
-    user_home="$(get_user_home)"
-    local nvm_dir="${user_home}/.nvm"
-
-    if [[ -d "${nvm_dir}" ]]; then
-        log_warn "nvm 已安装于 ${nvm_dir}"
-        export NVM_DIR="${nvm_dir}"
-        [ -s "${nvm_dir}/nvm.sh" ] && . "${nvm_dir}/nvm.sh"
+    if [[ -d "${install_dir}" ]]; then
+        log_warn "Miniforge 已安装，跳过"
         return 0
     fi
 
-    export NVM_NODEJS_ORG_MIRROR="${NVM_NODE_MIRROR}"
-    export NVM_DIR="${nvm_dir}"
-
-    local installer="/tmp/nvm-install.sh"
-    if ! download_file "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" "${installer}"; then
-        log_error "nvm 安装脚本下载失败"
+    log_info "下载 Miniforge..."
+    local url="${CONDA_MIRROR}/Miniforge3-Linux-${ARCH}.sh"
+    if ! curl -fsSL -o "${installer}" "${url}"; then
+        log_error "Miniforge 下载失败: ${url}"
         return 1
     fi
+
+    log_info "安装 Miniforge 到 ${install_dir}..."
+    if ! bash "${installer}" -b -p "${install_dir}"; then
+        log_error "Miniforge 安装失败"
+        return 1
+    fi
+    rm -f "${installer}"
+
+    sudo -u "${REAL_USER}" "${install_dir}/bin/conda" config --system --set channel_priority strict 2>/dev/null || true
+    sudo -u "${REAL_USER}" "${install_dir}/bin/conda" config --system --add channels conda-forge 2>/dev/null || true
+    sudo -u "${REAL_USER}" "${install_dir}/bin/conda" init bash 2>/dev/null || true
+    log_info "Miniforge 安装完成"
+}
+verify_python() { [[ -f "$(get_user_home)/miniforge3/bin/python" ]]; }
+
+install_node() {
+    log_step "安装 Node.js"
+    local user_home="$(get_user_home)"
+    if [[ -d "${user_home}/.nvm" ]]; then log_warn "nvm 已安装，跳过"; return 0; fi
 
     log_info "安装 nvm..."
-    sudo -u "${REAL_USER}" bash "${installer}" 2>/dev/null
-    rm -f "${installer}"
+    sudo -u "${REAL_USER}" curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | sudo -u "${REAL_USER}" bash
 
-    [ -s "${nvm_dir}/nvm.sh" ] && . "${nvm_dir}/nvm.sh"
-
-    log_info "安装 Node.js LTS..."
-    NVM_NODEJS_ORG_MIRROR="${NVM_NODE_MIRROR}" nvm install --lts 2>/dev/null || {
-        log_warn "通过镜像安装失败，尝试官方源..."
-        NVM_NODEJS_ORG_MIRROR="https://nodejs.org/dist" nvm install --lts 2>/dev/null
-    }
-    nvm use --lts 2>/dev/null || true
-    nvm alias default lts/* 2>/dev/null || true
-
-    if command -v npm &>/dev/null; then
-        sudo -u "${REAL_USER}" npm config set registry "${NPM_MIRROR}" 2>/dev/null || true
-        log_info "已配置 npm 镜像源: ${NPM_MIRROR}"
-    fi
-
-    log_info "nvm + Node.js 安装完成"
+    export NVM_DIR="${user_home}/.nvm"
+    [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
+    nvm install --lts
+    log_info "Node.js 安装完成"
 }
+verify_node() { [[ -d "$(get_user_home)/.nvm" ]] && command -v node &>/dev/null; }
 
-verify_node() {
-    command -v node &>/dev/null || {
-        local user_home
-        user_home="$(get_user_home)"
-        [[ -s "${user_home}/.nvm/nvm.sh" ]]
-    }
-}
-
-# ============================================================================
-# 安装函数: Go
-# ============================================================================
 install_go() {
     log_step "安装 Go"
-
-    local go_version
-    go_version=$(curl -sSf "https://go.dev/VERSION?m=text" 2>/dev/null | head -1)
-    if [[ -z "${go_version}" ]]; then
-        go_version="go1.22.4"
-        log_warn "无法获取最新版本，使用默认: ${go_version}"
-    fi
-
-    local go_tar="${go_version}.linux-${ARCH}.tar.gz"
     local install_dir="/usr/local"
+    if [[ -f "${install_dir}/go/bin/go" ]]; then log_warn "Go 已安装，跳过"; return 0; fi
 
-    if [[ -f "${install_dir}/go/bin/go" ]]; then
-        local installed_version
-        installed_version=$("${install_dir}/go/bin/go" version 2>/dev/null | awk '{print $3}')
-        if [[ "${installed_version}" == "${go_version}" ]]; then
-            log_info "Go ${go_version} 已安装，跳过"
-            return 0
-        fi
-    fi
+    log_info "下载 Go..."
+    local go_url="https://go.dev/dl/go1.22.4.linux-${ARCH}.tar.gz"
+    local tarball="/tmp/go.tar.gz"
+    if ! curl -fsSL -o "${tarball}" "${go_url}"; then log_error "Go 下载失败"; return 1; fi
 
-    local url="https://go.dev/dl/${go_tar}"
-    local mirror_url="${MIRROR_ALIYUN}/golang/${go_tar}"
-    local output="/tmp/${go_tar}"
-
-    log_info "下载 Go ${go_version}..."
-    if ! download_file "${url}" "${output}"; then
-        log_warn "官方源下载失败，尝试阿里云镜像..."
-        if ! download_file "${mirror_url}" "${output}"; then
-            log_error "Go 下载失败（官方源和镜像均失败）"
-            return 1
-        fi
-    fi
-
+    log_info "解压 Go..."
     rm -rf "${install_dir}/go"
-    log_info "解压 Go 到 ${install_dir}..."
-    if ! tar -C "${install_dir}" -xzf "${output}"; then
-        log_error "Go 解压失败"
-        rm -f "${output}"
-        return 1
-    fi
-    rm -f "${output}"
+    tar -C "${install_dir}" -xzf "${tarball}"
+    rm -f "${tarball}"
 
-    local profile_file="/etc/profile.d/golang.sh"
-    cat > "${profile_file}" <<'EOF'
-export GOROOT=/usr/local/go
-export GOPATH=${HOME}/go
-export PATH=${GOROOT}/bin:${GOPATH}/bin:${PATH}
-EOF
-    chmod 644 "${profile_file}"
-
-    local user_home
-    user_home="$(get_user_home)"
-    local user_profile="${user_home}/.bashrc"
-    ensure_path_entry "/usr/local/go/bin" "${user_profile}"
-    append_once "${user_profile}" 'export GOPATH="${HOME}/go"'
-    ensure_path_entry '${GOPATH}/bin' "${user_profile}"
-    chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
-
-    append_once "${user_profile}" "export GOPROXY=${GO_PROXY}"
-    chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
-
-    log_info "Go ${go_version} 安装完成，已配置 GOPROXY=${GO_PROXY}"
+    cat > /etc/profile.d/go.sh << 'GOEOF'
+export PATH=$PATH:/usr/local/go/bin
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+export GO_PROXY=goproxy.cn,direct
+GOEOF
+    log_info "Go 安装完成"
 }
+verify_go() { command -v go &>/dev/null; }
 
-verify_go() {
-    command -v go &>/dev/null || [[ -f /usr/local/go/bin/go ]]
-}
-
-# ============================================================================
-# 安装函数: Java
-# ============================================================================
 install_java() {
-    log_step "安装 Java (OpenJDK)"
-
-    local java_version="${1:-17}"
-
+    log_step "安装 Java"
     case "${PKG_MGR}" in
-        apt)
-            pkg_install "openjdk-${java_version}-jdk" || pkg_install default-jdk
-            ;;
-        dnf|yum)
-            pkg_install "java-${java_version}-openjdk-devel" || pkg_install java-17-openjdk-devel
-            ;;
+        apt) pkg_install openjdk-17-jdk ;;
+        dnf|yum) pkg_install java-17-openjdk-devel ;;
     esac
-
-    # 配置 JAVA_HOME
-    local java_home
-    java_home=$(dirname $(dirname $(readlink -f $(command -v javac))))
-    if [[ -n "${java_home}" ]]; then
-        local profile_file="/etc/profile.d/java.sh"
-        cat > "${profile_file}" <<EOF
-export JAVA_HOME=${java_home}
-export PATH=\${JAVA_HOME}/bin:\${PATH}
-EOF
-        chmod 644 "${profile_file}"
-
-        local user_home
-        user_home="$(get_user_home)"
-        local user_profile="${user_home}/.bashrc"
-        append_once "${user_profile}" "export JAVA_HOME=${java_home}"
-        ensure_path_entry '${JAVA_HOME}/bin' "${user_profile}"
-        chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
-    fi
-
-    log_info "Java OpenJDK ${java_version} 安装完成"
+    log_info "Java 安装完成"
 }
+verify_java() { command -v java &>/dev/null; }
 
-verify_java() {
-    command -v java &>/dev/null && command -v javac &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: Rust
-# ============================================================================
 install_rust() {
-    log_step "安装 Rust (通过 rustup)"
+    log_step "安装 Rust"
+    local user_home="$(get_user_home)"
+    if [[ -d "${user_home}/.cargo" ]]; then log_warn "Rust 已安装，跳过"; return 0; fi
 
-    local user_home
-    user_home="$(get_user_home)"
-    local cargo_dir="${user_home}/.cargo"
-
-    if [[ -f "${cargo_dir}/bin/rustc" ]]; then
-        log_warn "Rust 已安装于 ${cargo_dir}，跳过"
-        return 0
-    fi
-
-    export RUSTUP_DIST_SERVER="${RUSTUP_MIRROR}"
-    export RUSTUP_UPDATE_ROOT="${RUSTUP_MIRROR}/rustup"
-
-    local installer="/tmp/rustup-init.sh"
-    if ! download_file "https://sh.rustup.rs" "${installer}"; then
-        log_error "Rust 安装脚本下载失败"
-        return 1
-    fi
-
-    log_info "安装 Rust..."
-    sudo -u "${REAL_USER}" RUSTUP_DIST_SERVER="${RUSTUP_MIRROR}" \
-        RUSTUP_UPDATE_ROOT="${RUSTUP_MIRROR}/rustup" \
-        bash "${installer}" -y --default-toolchain stable 2>/dev/null
-    rm -f "${installer}"
-
-    # 配置 crates.io 国内镜像
-    local cargo_config="${cargo_dir}/config"
-    mkdir -p "${cargo_dir}"
-    cat > "${cargo_config}" <<EOF
-[source.crates-io]
-replace-with = 'ustc'
-
-[source.ustc]
-registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
-EOF
-    chown -R "${REAL_USER}:${REAL_USER}" "${cargo_dir}" 2>/dev/null || true
-
-    local user_profile="${user_home}/.bashrc"
-    ensure_path_entry '${HOME}/.cargo/bin' "${user_profile}"
-    chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
-
-    log_info "Rust 安装完成，已配置 USTC crates.io 镜像"
+    log_info "安装 rustup..."
+    sudo -u "${REAL_USER}" curl --proto '=https' --tlsv1.2 -fsSL "https://rsproxy.cn/rustup-init.sh" -o /tmp/rustup-init.sh
+    sudo -u "${REAL_USER}" bash /tmp/rustup-init.sh -y --default-host "${ARCH}-unknown-linux-gnu"
+    rm -f /tmp/rustup-init.sh
+    log_info "Rust 安装完成"
 }
+verify_rust() { [[ -f "$(get_user_home)/.cargo/bin/rustc" ]]; }
 
-verify_rust() {
-    local user_home
-    user_home="$(get_user_home)"
-    command -v rustc &>/dev/null || [[ -f "${user_home}/.cargo/bin/rustc" ]]
-}
-
-# ============================================================================
-# 安装函数: Docker
-# ============================================================================
 install_docker() {
     log_step "安装 Docker"
-
-    if command -v docker &>/dev/null; then
-        log_warn "Docker 已安装，跳过"
-        return 0
-    fi
+    if command -v docker &>/dev/null; then log_warn "Docker 已安装，跳过"; return 0; fi
 
     case "${PKG_MGR}" in
         apt)
-            pkg_install ca-certificates curl gnupg lsb-release
-            local keyring="/etc/apt/keyrings/docker.gpg"
-            mkdir -p /etc/apt/keyrings
-            if [[ ! -f "${keyring}" ]]; then
-                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o "${keyring}" 2>/dev/null
-                chmod a+r "${keyring}"
-            fi
-            local codename
-            codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://download.docker.com/linux/ubuntu ${codename} stable" \
-                > /etc/apt/sources.list.d/docker.list
-            pkg_update
-            pkg_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            pkg_install apt-transport-https ca-certificates curl gnupg lsb-release
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+            apt-get update -y
+            pkg_install docker-ce docker-ce-cli containerd.io
             ;;
         dnf|yum)
             pkg_install yum-utils
-            yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null || \
-            dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null
-            pkg_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            pkg_install docker-ce docker-ce-cli containerd.io
             ;;
     esac
-
-    systemctl start docker 2>/dev/null || true
     systemctl enable docker 2>/dev/null || true
-    usermod -aG docker "${REAL_USER}" 2>/dev/null || true
-
-    # 配置 Docker 国内镜像
-    mkdir -p /etc/docker
-    cat > /etc/docker/daemon.json <<EOF
-{
-  "registry-mirrors": [
-    "https://docker.mirrors.ustc.edu.cn",
-    "https://hub-mirror.c.163.com",
-    "https://mirror.ccs.tencentyun.com"
-  ]
+    systemctl start docker 2>/dev/null || true
+    [[ -n "${SUDO_USER:-}" ]] && usermod -aG docker "${SUDO_USER}"
+    log_info "Docker 安装完成"
 }
-EOF
+verify_docker() { command -v docker &>/dev/null; }
 
-    systemctl restart docker 2>/dev/null || true
-
-    log_info "Docker 安装完成，已配置国内镜像加速"
-    log_warn "请重新登录或运行 'newgrp docker' 以使用 docker 命令"
-}
-
-verify_docker() {
-    command -v docker &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: MySQL
-# ============================================================================
 install_mysql() {
     log_step "安装 MySQL"
-
-    case "${PKG_MGR}" in
-        apt)
-            # 设置 MySQL APT 仓库
-            local mysql_deb="/tmp/mysql-apt-config.deb"
-            if ! download_file "https://dev.mysql.com/get/mysql-apt-config_0.8.30-1_all.deb" "${mysql_deb}"; then
-                log_warn "下载 MySQL APT 配置失败，使用系统默认版本"
-                pkg_install mysql-server mysql-client
-            else
-                DEBIAN_FRONTEND=noninteractive dpkg -i "${mysql_deb}" 2>/dev/null
-                rm -f "${mysql_deb}"
-                pkg_update
-                pkg_install mysql-server mysql-client
-            fi
-            ;;
-        dnf|yum)
-            # 添加 MySQL 仓库
-            local mysql_rpm="/tmp/mysql80-community-release.rpm"
-            if ! download_file "https://dev.mysql.com/get/mysql80-community-release-el8-9.noarch.rpm" "${mysql_rpm}"; then
-                log_warn "下载 MySQL 仓库配置失败，使用 MariaDB 替代"
-                pkg_install mariadb-server mariadb
-            else
-                rpm -ivh "${mysql_rpm}" 2>/dev/null
-                rm -f "${mysql_rpm}"
-                # 禁用默认 MySQL 模块，启用 8.0
-                dnf module disable mysql -y 2>/dev/null || true
-                pkg_install mysql-community-server mysql-community-client
-            fi
-            ;;
-    esac
-
-    # 启动 MySQL
-    systemctl start mysql 2>/dev/null || systemctl start mysqld 2>/dev/null || true
-    systemctl enable mysql 2>/dev/null || systemctl enable mysqld 2>/dev/null || true
-
-    # 安全配置提示
+    pkg_install mysql-server
+    systemctl enable mysqld 2>/dev/null || true
+    systemctl start mysqld 2>/dev/null || true
     log_info "MySQL 安装完成"
-    log_warn "请运行 'mysql_secure_installation' 进行安全配置"
-    log_warn "首次登录密码请查看: /var/log/mysqld.log 或使用 sudo mysql"
 }
+verify_mysql() { command -v mysql &>/dev/null; }
 
-verify_mysql() {
-    command -v mysql &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: MongoDB
-# ============================================================================
 install_mongodb() {
     log_step "安装 MongoDB"
-
     case "${PKG_MGR}" in
         apt)
-            # 导入 MongoDB GPG key
-            curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-                gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg 2>/dev/null
-
-            # 添加仓库
-            local codename
-            codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
-            echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${codename}/mongodb-org/7.0 multiverse" \
-                > /etc/apt/sources.list.d/mongodb-org-7.0.list
-
-            pkg_update
+            pkg_install gnupg curl
+            curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+            echo "deb [signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+            apt-get update -y
             pkg_install mongodb-org
             ;;
         dnf|yum)
-            cat > /etc/yum.repos.d/mongodb-org-7.0.repo <<'EOF'
+            cat > /etc/yum.repos.d/mongodb-org-7.0.repo << 'MONGOEOF'
 [mongodb-org-7.0]
 name=MongoDB Repository
-baseurl=https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/7.0/x86_64/
+baseurl=https://repo.mongodb.org/yum/redhat/\$releasever/mongodb-org/7.0/x86_64/
 gpgcheck=1
 enabled=1
 gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
-EOF
+MONGOEOF
             pkg_install mongodb-org
             ;;
     esac
-
-    # 启动 MongoDB
-    systemctl start mongod 2>/dev/null || true
     systemctl enable mongod 2>/dev/null || true
-
-    # 配置 MongoDB 国内镜像 (用于工具安装)
-    append_once "$(get_user_home)/.bashrc" 'export MONGODB_TOOLS_REPO="https://mirrors.tuna.tsinghua.edu.cn/mongodb"'
-
-    log_info "MongoDB 7.0 安装完成"
-    log_warn "MongoDB 默认无需密码，生产环境请配置认证"
+    systemctl start mongod 2>/dev/null || true
+    log_info "MongoDB 安装完成"
 }
+verify_mongodb() { command -v mongod &>/dev/null; }
 
-verify_mongodb() {
-    command -v mongod &>/dev/null || command -v mongosh &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: Redis
-# ============================================================================
 install_redis() {
     log_step "安装 Redis"
-
-    case "${PKG_MGR}" in
-        apt)
-            # 添加 Redis 仓库
-            curl -fsSL https://packages.redis.io/gpg | \
-                gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg 2>/dev/null
-            echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" \
-                > /etc/apt/sources.list.d/redis.list
-            pkg_update
-            pkg_install redis
-            ;;
-        dnf|yum)
-            pkg_install epel-release 2>/dev/null || true
-            pkg_install redis
-            ;;
-    esac
-
-    # 启动 Redis
-    systemctl start redis 2>/dev/null || systemctl start redis-server 2>/dev/null || true
+    pkg_install redis
     systemctl enable redis 2>/dev/null || systemctl enable redis-server 2>/dev/null || true
-
-    # 配置 Redis 国内镜像 (用于客户端库)
-    append_once "$(get_user_home)/.bashrc" 'export REDIS_CLIENT_REPO="https://mirrors.tuna.tsinghua.edu.cn/redis"'
-
+    systemctl start redis 2>/dev/null || systemctl start redis-server 2>/dev/null || true
     log_info "Redis 安装完成"
-    log_warn "Redis 默认监听 127.0.0.1:6379，生产环境请配置密码"
 }
+verify_redis() { command -v redis-server &>/dev/null; }
 
-verify_redis() {
-    command -v redis-server &>/dev/null || command -v redis-cli &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: Git
-# ============================================================================
 install_git() {
     log_step "安装 Git"
-
-    case "${PKG_MGR}" in
-        apt|dnf|yum)
-            pkg_install git git-lfs
-            ;;
-    esac
-
-    local user_home
-    user_home="$(get_user_home)"
-    local gitconfig="${user_home}/.gitconfig"
-
-    if [[ ! -f "${gitconfig}" ]] || ! grep -q "\[user\]" "${gitconfig}" 2>/dev/null; then
-        sudo -u "${REAL_USER}" git config --global init.defaultBranch main
-        sudo -u "${REAL_USER}" git config --global core.autocrlf input
-    fi
-
+    pkg_install git
+    sudo -u "${REAL_USER}" git config --global init.defaultBranch main
+    sudo -u "${REAL_USER}" git config --global core.autocrlf input
     log_info "Git 安装完成"
 }
+verify_git() { command -v git &>/dev/null; }
 
-verify_git() {
-    command -v git &>/dev/null
-}
-
-# ============================================================================
-# 安装函数: Make & CMake
-# ============================================================================
 install_make() {
     log_step "安装 Make & CMake"
-
-    case "${PKG_MGR}" in
-        apt|dnf|yum)
-            pkg_install make cmake autoconf automake libtool
-            ;;
-    esac
-
+    pkg_install make cmake autoconf automake libtool
     log_info "Make & CMake 安装完成"
 }
+verify_make() { command -v make &>/dev/null && command -v cmake &>/dev/null; }
 
-verify_make() {
-    command -v make &>/dev/null && command -v cmake &>/dev/null
-}
-
-# ============================================================================
-# 通用安装/验证包装器
-# ============================================================================
 run_language_step() {
     local lang="$1" func_name="$2" verify_func="$3"
-    local start_time
-    start_time=$(date +%s)
+    local start_time=$(date +%s)
 
     log_info "开始安装 ${lang}..."
-
     if "${func_name}"; then
         if "${verify_func}"; then
             local elapsed=$(( $(date +%s) - start_time ))
@@ -1004,26 +332,116 @@ run_language_step() {
             return 0
         else
             log_warn "${lang} 安装完成但验证失败"
-            log_error_to_file "${lang}" "verify" 1 "installation completed but verification failed"
+            log_error_to_file "${lang}" "verify" 1 "verification failed"
             return 1
         fi
     else
         local exit_code=$?
-        log_error "${lang} 安装失败 (exit code: ${exit_code})"
-        log_error_to_file "${lang}" "install" "${exit_code}" "installation function returned non-zero"
+        log_error "${lang} 安装失败 (exit: ${exit_code})"
+        log_error_to_file "${lang}" "install" "${exit_code}" "installation failed"
         return ${exit_code}
     fi
 }
 
-# ============================================================================
-# 主流程
-# ============================================================================
-main() {
+show_number_menu() {
     echo ""
-    log_info "Linux 开发语言自动安装工具 v2.1"
+    printf "  ╔══════════════════════════════════════════════════════╗\n"
+    printf "  ║        Linux 开发环境自动安装工具                   ║\n"
+    printf "  ╚══════════════════════════════════════════════════════╝\n"
+    echo ""
+    printf "  输入要安装的项目编号（空格分隔），或直接回车安装全部\n"
+    echo ""
+    printf "  示例: 1 2 3  或  1-5  或  all\n"
     echo ""
 
-    # 系统检测
+    local total=${#MENU_ITEMS[@]}
+    for ((i=0; i<total; i++)); do
+        IFS='|' read -r key desc <<< "${MENU_ITEMS[i]}"
+        printf "  %2d) %s\n" "$((i+1))" "${desc}"
+    done
+
+    echo ""
+    printf "  请输入: "
+}
+
+parse_selection() {
+    local input="$1"
+    local total=${#MENU_ITEMS[@]}
+    local selections=()
+
+    if [[ -z "${input}" || "${input}" == "all" ]]; then
+        for ((i=0; i<total; i++)); do
+            IFS='|' read -r key _ <<< "${MENU_ITEMS[i]}"
+            selections+=("${key}")
+        done
+        echo "${selections[*]}"
+        return
+    fi
+
+    IFS=' ' read -ra parts <<< "${input}"
+    for part in "${parts[@]}"; do
+        if [[ "${part}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            local start="${BASH_REMATCH[1]}"
+            local end="${BASH_REMATCH[2]}"
+            for ((i=start; i<=end; i++)); do
+                if [[ ${i} -ge 1 && ${i} -le ${total} ]]; then
+                    IFS='|' read -r key _ <<< "${MENU_ITEMS[i-1]}"
+                    selections+=("${key}")
+                fi
+            done
+        elif [[ "${part}" =~ ^[0-9]+$ ]]; then
+            if [[ ${part} -ge 1 && ${part} -le ${total} ]]; then
+                IFS='|' read -r key _ <<< "${MENU_ITEMS[part-1]}"
+                selections+=("${key}")
+            fi
+        fi
+    done
+    echo "${selections[*]}"
+}
+
+usage() {
+    cat << 'USAGEEOF'
+用法: sudo ./install-langs.sh [选项]
+
+选项:
+  -h, --help     显示帮助
+  -i, --items    要安装的项目（逗号分隔或编号）
+  -y, --yes      跳过确认
+
+示例:
+  sudo ./install-langs.sh              # 交互式选择
+  sudo ./install-langs.sh -i 1,2,3     # 安装编号 1,2,3
+  sudo ./install-langs.sh -i cpp,go    # 安装指定项目
+  sudo ./install-langs.sh -i all -y    # 全部安装，跳过确认
+
+USAGEEOF
+    echo "可用项目:"
+    local total=${#MENU_ITEMS[@]}
+    for ((i=0; i<total; i++)); do
+        IFS='|' read -r key desc <<< "${MENU_ITEMS[i]}"
+        printf "  %2d) %-10s %s\n" "$((i+1))" "${key}" "${desc}"
+    done
+}
+
+main() {
+    local selections=""
+    local auto_confirm=false
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) usage; exit 0 ;;
+            -i|--items)
+                if [[ -n "${2:-}" ]]; then selections="$2"; shift 2
+                else log_error "-i 需要参数"; exit 1; fi
+                ;;
+            -y|--yes) auto_confirm=true; shift ;;
+            *) log_error "未知选项: $1"; usage; exit 1 ;;
+        esac
+    done
+
+    echo ""
+    log_info "Linux 开发环境自动安装工具 v2.0"
+    echo ""
+
     detect_os
     detect_real_user
 
@@ -1032,124 +450,85 @@ main() {
     log_info "包管理器: ${PKG_MGR}"
     log_info "用户: ${REAL_USER}"
 
-    # 权限检查
     if ! ${IS_ROOT}; then
-        log_error "此脚本需要 root 或 sudo 权限运行"
-        log_error "请使用: sudo $0"
+        log_error "需要 root 权限运行: sudo $0"
         exit 1
     fi
 
     if [[ "${PKG_MGR}" == "unknown" ]]; then
-        log_error "不支持的 Linux 发行版: ${OS_ID}"
-        log_error "支持: Ubuntu, Debian, CentOS, RHEL, Rocky, AlmaLinux"
+        log_error "不支持的系统: ${OS_ID}"
         exit 1
     fi
 
-    # 网络检测与镜像切换
     log_step "网络检测"
     if should_use_mirror; then
-        log_warn "检测到网络问题，尝试切换国内镜像源..."
+        log_warn "网络问题，切换国内镜像..."
         case "${PKG_MGR}" in
-            apt)     switch_apt_mirror ;;
+            apt) switch_apt_mirror ;;
             dnf|yum) switch_yum_mirror ;;
         esac
     else
-        log_info "网络连接正常"
+        log_info "网络正常"
     fi
 
-    # 更新包索引
     log_info "更新包索引..."
-    pkg_update 2>/dev/null || log_warn "包索引更新失败，继续执行..."
-
-    # 交互式菜单选择
-    local selections
-    selections=$(show_interactive_menu)
+    pkg_update 2>/dev/null || log_warn "包索引更新失败"
 
     if [[ -z "${selections}" ]]; then
-        log_error "未选择任何项目，退出"
+        show_number_menu
+        read -r input
+        selections=$(parse_selection "${input}")
+    else
+        selections=$(parse_selection "${selections//,/ }")
+    fi
+
+    if [[ -z "${selections}" ]]; then
+        log_error "未选择任何项目"
         exit 1
     fi
 
-    # 确认安装
     echo ""
     log_info "将安装: ${selections}"
-    read -rp "确认继续? [Y/n]: " confirm
-    if [[ "${confirm}" =~ ^[nN] ]]; then
-        log_info "用户取消，退出"
-        exit 0
+
+    if ! ${auto_confirm}; then
+        read -rp "确认继续? [Y/n]: " confirm
+        [[ "${confirm}" =~ ^[nN] ]] && { log_info "已取消"; exit 0; }
     fi
 
-    # 初始化错误日志
-    echo "# install-langs.sh 错误日志 - $(date +"${TIMESTAMP_FORMAT}")" > "${ERROR_LOG}"
-    echo "# 格式: timestamp level=ERROR lang=xxx phase=xxx exit=xxx msg=\"xxx\"" >> "${ERROR_LOG}"
+    echo "# 错误日志 - $(date +"${TIMESTAMP_FORMAT}")" > "${ERROR_LOG}"
     echo "" >> "${ERROR_LOG}"
 
-    # 执行安装
-    local total=0
-    local success=0
-    local failed=0
-    local failed_list=()
+    local total=0 success=0 failed=0 failed_list=()
 
     for lang in ${selections}; do
         ((total++))
         case "${lang}" in
-            cpp)
-                if run_language_step "C/C++" install_cpp verify_cpp; then ((success++)); else ((failed++)); failed_list+=("C/C++"); fi
-                ;;
-            python)
-                if run_language_step "Python" install_python verify_python; then ((success++)); else ((failed++)); failed_list+=("Python"); fi
-                ;;
-            node)
-                if run_language_step "Node.js" install_node verify_node; then ((success++)); else ((failed++)); failed_list+=("Node.js"); fi
-                ;;
-            go)
-                if run_language_step "Go" install_go verify_go; then ((success++)); else ((failed++)); failed_list+=("Go"); fi
-                ;;
-            java)
-                if run_language_step "Java" install_java verify_java; then ((success++)); else ((failed++)); failed_list+=("Java"); fi
-                ;;
-            rust)
-                if run_language_step "Rust" install_rust verify_rust; then ((success++)); else ((failed++)); failed_list+=("Rust"); fi
-                ;;
-            docker)
-                if run_language_step "Docker" install_docker verify_docker; then ((success++)); else ((failed++)); failed_list+=("Docker"); fi
-                ;;
-            mysql)
-                if run_language_step "MySQL" install_mysql verify_mysql; then ((success++)); else ((failed++)); failed_list+=("MySQL"); fi
-                ;;
-            mongodb)
-                if run_language_step "MongoDB" install_mongodb verify_mongodb; then ((success++)); else ((failed++)); failed_list+=("MongoDB"); fi
-                ;;
-            redis)
-                if run_language_step "Redis" install_redis verify_redis; then ((success++)); else ((failed++)); failed_list+=("Redis"); fi
-                ;;
-            git)
-                if run_language_step "Git" install_git verify_git; then ((success++)); else ((failed++)); failed_list+=("Git"); fi
-                ;;
-            make)
-                if run_language_step "Make & CMake" install_make verify_make; then ((success++)); else ((failed++)); failed_list+=("Make & CMake"); fi
-                ;;
+            cpp) run_language_step "C/C++" install_cpp verify_cpp && ((success++)) || { ((failed++)); failed_list+=("C/C++"); } ;;
+            python) run_language_step "Python" install_python verify_python && ((success++)) || { ((failed++)); failed_list+=("Python"); } ;;
+            node) run_language_step "Node.js" install_node verify_node && ((success++)) || { ((failed++)); failed_list+=("Node.js"); } ;;
+            go) run_language_step "Go" install_go verify_go && ((success++)) || { ((failed++)); failed_list+=("Go"); } ;;
+            java) run_language_step "Java" install_java verify_java && ((success++)) || { ((failed++)); failed_list+=("Java"); } ;;
+            rust) run_language_step "Rust" install_rust verify_rust && ((success++)) || { ((failed++)); failed_list+=("Rust"); } ;;
+            docker) run_language_step "Docker" install_docker verify_docker && ((success++)) || { ((failed++)); failed_list+=("Docker"); } ;;
+            mysql) run_language_step "MySQL" install_mysql verify_mysql && ((success++)) || { ((failed++)); failed_list+=("MySQL"); } ;;
+            mongodb) run_language_step "MongoDB" install_mongodb verify_mongodb && ((success++)) || { ((failed++)); failed_list+=("MongoDB"); } ;;
+            redis) run_language_step "Redis" install_redis verify_redis && ((success++)) || { ((failed++)); failed_list+=("Redis"); } ;;
+            git) run_language_step "Git" install_git verify_git && ((success++)) || { ((failed++)); failed_list+=("Git"); } ;;
+            make) run_language_step "Make & CMake" install_make verify_make && ((success++)) || { ((failed++)); failed_list+=("Make & CMake"); } ;;
         esac
     done
 
-    # 输出汇总
     echo ""
     log_step "安装汇总"
     log_info "总计: ${total}  成功: ${success}  失败: ${failed}"
 
     if [[ ${failed} -gt 0 ]]; then
-        log_warn "失败的项目: ${failed_list[*]}"
-        log_warn "详细错误请查看: ${ERROR_LOG}"
+        log_warn "失败: ${failed_list[*]}"
+        log_warn "错误日志: ${ERROR_LOG}"
     fi
 
-    if [[ ${success} -gt 0 ]]; then
-        log_info "请运行 'source ~/.bashrc' 或重新登录以使环境变量生效"
-    fi
-
+    [[ ${success} -gt 0 ]] && log_info "请运行 'source ~/.bashrc' 使环境生效"
     echo ""
 }
 
-# ============================================================================
-# 入口
-# ============================================================================
 main "$@"
