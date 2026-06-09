@@ -93,14 +93,11 @@ init_menu_selections() {
 draw_menu() {
     local total=${#MENU_ITEMS[@]}
 
-    # 移动光标到菜单起始位置
-    tput civis  # 隐藏光标
+    # 隐藏光标
+    printf "\033[?25l"
 
-    # 清除菜单区域 (total + header + footer)
-    for ((i=0; i<total+6; i++)); do
-        tput cuu1 2>/dev/null || printf "\033[A"
-        tput el 2>/dev/null || printf "\033[2K"
-    done
+    # 清屏
+    printf "\033[2J\033[H"
 
     # 绘制标题
     printf "\033[1;36m"
@@ -110,6 +107,7 @@ draw_menu() {
     printf "║  ↑↓: 移动  空格: 选中/取消  a: 全选  Enter: 确认   ║\n"
     printf "╚══════════════════════════════════════════════════════╝\n"
     printf "\033[0m"
+    printf "\n"
 
     # 绘制菜单项
     for ((i=0; i<total; i++)); do
@@ -123,10 +121,8 @@ draw_menu() {
         fi
 
         # 选中状态
-        local check=" "
         if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
-            check="✓"
-            printf "  ▸ [\033[1;32m%s\033[0m" "${check}"
+            printf "  ▸ [\033[1;32m✓\033[0m"
             if [[ ${i} -eq ${MENU_CURSOR} ]]; then
                 printf "\033[1;37;44m"
             fi
@@ -207,7 +203,6 @@ show_interactive_menu() {
     init_menu_selections
 
     # 绘制初始菜单
-    printf "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"  # 预留空间
     draw_menu
 
     # 读取键盘输入
@@ -244,7 +239,7 @@ show_interactive_menu() {
     done
 
     # 恢复光标
-    tput cnorm
+    printf "\033[?25h"
 
     printf "\033[0m\n"
     echo "${selections[*]}"
