@@ -150,17 +150,21 @@ show_interactive_menu() {
     # 首次绘制
     draw_menu
 
-    # 输入循环 - 使用简单可靠的 read 方式
+    # 输入循环 - 兼容 Linux 终端
     while true; do
-        # 读取单个字符 (不回显)
+        # 读取单个字符 (不回显，带超时)
         local key
-        read -r -n1 -s key
+        if ! read -r -s -n1 -t 1 key; then
+            # 超时或无输入，继续循环
+            continue
+        fi
 
-        # 方向键检测: ESC [ A/B
+        # 方向键检测: ESC 序列
         if [[ "${key}" == $'\033' ]]; then
-            # 读取后续字节
-            read -r -n2 -s key 2>/dev/null
-            case "${key}" in
+            # 读取后续 2 字符 (带短超时)
+            local rest
+            read -r -s -n2 -t 0.1 rest 2>/dev/null || true
+            case "${rest}" in
                 "[A") # 上
                     MENU_CURSOR=$(( (MENU_CURSOR - 1 + total) % total ))
                     ;;
@@ -195,7 +199,7 @@ show_interactive_menu() {
                     MENU_SELECTED["${k}"]=1
                 fi
             done
-        elif [[ -z "${key}" ]]; then
+        elif [[ "${key}" == $'\n' || -z "${key}" ]]; then
             # Enter - 确认
             break
         fi
