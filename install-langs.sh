@@ -78,6 +78,23 @@ log_error_to_file() {
 declare -A MENU_SELECTED=()
 MENU_CURSOR=0
 
+# 检测终端是否支持颜色
+supports_color() {
+    if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# 清屏
+clear_screen() {
+    if command -v tput &>/dev/null; then
+        tput clear 2>/dev/null || printf "\033[2J\033[H"
+    else
+        printf "\033[2J\033[H"
+    fi
+}
+
 # 初始化默认选中状态
 init_menu_selections() {
     for item in "${MENU_ITEMS[@]}"; do
@@ -94,41 +111,52 @@ init_menu_selections() {
 draw_menu() {
     local total=${#MENU_ITEMS[@]}
 
-    # 清屏并移动光标到左上角
-    printf "\033[2J\033[H"
-
-    # 隐藏光标
-    printf "\033[?25l"
+    # 清屏
+    clear_screen
 
     # 标题
     printf "\n"
-    printf "\033[1;36m  ╔══════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;36m  ║        Linux 开发语言自动安装工具                   ║\033[0m\n"
-    printf "\033[1;36m  ╚══════════════════════════════════════════════════════╝\033[0m\n"
+    if supports_color; then
+        printf "\033[1;36m  ╔══════════════════════════════════════════════════════╗\033[0m\n"
+        printf "\033[1;36m  ║        Linux 开发语言自动安装工具                   ║\033[0m\n"
+        printf "\033[1;36m  ╚══════════════════════════════════════════════════════╝\033[0m\n"
+    else
+        printf "  ╔══════════════════════════════════════════════════════╗\n"
+        printf "  ║        Linux 开发语言自动安装工具                   ║\n"
+        printf "  ╚══════════════════════════════════════════════════════╝\n"
+    fi
     printf "\n"
 
     # 操作提示
-    printf "  \033[0;37m↑↓\033[0m 移动光标    \033[0;37m空格\033[0m 选中/取消    \033[0;37ma\033[0m 全选    \033[0;37mEnter\033[0m 确认\033[0m\n"
+    printf "  ↑↓ 移动光标    空格 选中/取消    a 全选    Enter 确认\n"
     printf "\n"
 
     # 绘制菜单项
     for ((i=0; i<total; i++)); do
         IFS='|' read -r key desc default <<< "${MENU_ITEMS[i]}"
 
-        # 光标高亮背景
+        # 光标高亮
         if [[ ${i} -eq ${MENU_CURSOR} ]]; then
-            printf "\033[1;37;44m  ▸ "
+            if supports_color; then
+                printf "\033[1;37;44m  ▸ "
+            else
+                printf "  > "
+            fi
         else
-            printf "\033[0m    "
+            printf "    "
         fi
 
         # 选中状态 checkbox
         if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
-            printf "[\033[1;32m✓\033[0m"
-            if [[ ${i} -eq ${MENU_CURSOR} ]]; then
-                printf "\033[1;37;44m"
+            if supports_color; then
+                printf "[\033[1;32m✓\033[0m"
+                if [[ ${i} -eq ${MENU_CURSOR} ]]; then
+                    printf "\033[1;37;44m"
+                fi
+                printf "] %s" "${desc}"
+            else
+                printf "[✓] %s" "${desc}"
             fi
-            printf "] %s" "${desc}"
         else
             printf "[ ] %s" "${desc}"
         fi
@@ -145,7 +173,7 @@ draw_menu() {
             ((selected_count++))
         fi
     done
-    printf "  \033[0;36m已选中: %d 项\033[0m\n" "${selected_count}"
+    printf "  已选中: %d 项\n" "${selected_count}"
 }
 
 # 主菜单交互循环
@@ -153,6 +181,14 @@ show_interactive_menu() {
     init_menu_selections
 
     local total=${#MENU_ITEMS[@]}
+
+    # 保存当前终端设置并设置为 raw 模式
+    local old_stty
+    old_stty=$(stty -g 2>/dev/null)
+    stty -echo -icanon min 1 time 0 2>/dev/null
+
+    # 退出时恢复终端设置
+    trap 'stty "${old_stty}" 2>/dev/null; printf "\033[?25h\033[0m\n"' EXIT
 
     # 首次绘制
     draw_menu
@@ -165,6 +201,7 @@ show_interactive_menu() {
 
         # 检测方向键 (ESC + [ + A/B)
         if [[ "${key}" == $'\033' ]]; then
+            # 读取更多字节
             read -rsn2 key
             case "${key}" in
                 "[A") # 上
@@ -212,8 +249,10 @@ show_interactive_menu() {
         draw_menu
     done
 
-    # 恢复光标
-    printf "\033[?25h"
+    # 恢复终端设置
+    stty "${old_stty}" 2>/dev/null
+    trap - EXIT
+    printf "\033[?25h"  # 恢复光标
 
     # 返回选中的项目
     local selections=()
