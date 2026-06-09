@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================================
 # install-langs.sh — Linux 服务器开发语言自动安装工具
-# 支持: C/C++, Python, Node.js, Go
-# 特性: 版本管理工具、国内镜像切换、错误日志
+# 支持: C/C++, Python, Node.js, Go, Java, Rust, Docker, Git, Make
+# 特性: 版本管理工具、国内镜像切换、错误日志、交互式选择菜单
 # ============================================================================
 set -u -o pipefail
 
@@ -20,6 +20,8 @@ NPM_MIRROR="https://registry.npmmirror.com"
 GO_PROXY="https://goproxy.cn,direct"
 NVM_NODE_MIRROR="https://npmmirror.com/mirrors/node"
 CONDA_MIRROR="${MIRROR_TUNA}/anaconda/miniconda"
+RUSTUP_MIRROR="https://mirrors.ustc.edu.cn/rust-static"
+DOCKER_MIRROR="https://mirrors.aliyun.com/docker-ce"
 
 # 检测结果
 OS_ID=""
@@ -28,6 +30,22 @@ PKG_MGR=""
 ARCH=""
 REAL_USER=""
 IS_ROOT=false
+
+# 菜单项定义
+declare -a MENU_ITEMS=(
+    "cpp|C/C++ (gcc, g++, make, cmake)|1"
+    "python|Python (系统版本 或 Miniconda)|1"
+    "node|Node.js (通过 nvm)|1"
+    "go|Go|1"
+    "java|Java (OpenJDK)|1"
+    "rust|Rust (通过 rustup)|1"
+    "docker|Docker|1"
+    "git|Git|0"
+    "make|Make & CMake|0"
+)
+
+declare -A MENU_SELECTED=()
+MENU_CURSOR=0
 
 # ============================================================================
 # 日志函数
@@ -49,12 +67,187 @@ log_step() {
 }
 
 # 写入错误日志
-# 格式: timestamp level=ERROR lang=xxx phase=xxx exit=xxx msg="xxx"
 log_error_to_file() {
     local lang="$1" phase="$2" exit_code="$3" msg="$4"
     local ts
     ts="$(date +"${TIMESTAMP_FORMAT}")"
     echo "${ts} level=ERROR lang=${lang} phase=${phase} exit=${exit_code} msg=\"${msg}\"" >> "${ERROR_LOG}"
+}
+
+# ============================================================================
+# 交互式菜单 (空格选中)
+# ============================================================================
+# 初始化默认选中状态
+init_menu_selections() {
+    for item in "${MENU_ITEMS[@]}"; do
+        IFS='|' read -r key desc default <<< "${item}"
+        if [[ "${default}" == "1" ]]; then
+            MENU_SELECTED["${key}"]=1
+        else
+            MENU_SELECTED["${key}"]=0
+        fi
+    done
+}
+
+# 绘制菜单
+draw_menu() {
+    local total=${#MENU_ITEMS[@]}
+
+    # 移动光标到菜单起始位置
+    tput civis  # 隐藏光标
+
+    # 清除菜单区域 (total + header + footer)
+    for ((i=0; i<total+6; i++)); do
+        tput cuu1 2>/dev/null || printf "\033[A"
+        tput el 2>/dev/null || printf "\033[2K"
+    done
+
+    # 绘制标题
+    printf "\033[1;36m"
+    printf "╔══════════════════════════════════════════════════════╗\n"
+    printf "║        Linux 开发语言自动安装工具                   ║\n"
+    printf "╠══════════════════════════════════════════════════════╣\n"
+    printf "║  ↑↓: 移动  空格: 选中/取消  a: 全选  Enter: 确认   ║\n"
+    printf "╚══════════════════════════════════════════════════════╝\n"
+    printf "\033[0m"
+
+    # 绘制菜单项
+    for ((i=0; i<total; i++)); do
+        IFS='|' read -r key desc default <<< "${MENU_ITEMS[i]}"
+
+        # 高亮当前光标位置
+        if [[ ${i} -eq ${MENU_CURSOR} ]]; then
+            printf "\033[1;37;44m"  # 白字蓝底
+        else
+            printf "\033[0m"
+        fi
+
+        # 选中状态
+        local check=" "
+        if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
+            check="✓"
+            printf "  ▸ [\033[1;32m%s\033[0m" "${check}"
+            if [[ ${i} -eq ${MENU_CURSOR} ]]; then
+                printf "\033[1;37;44m"
+            fi
+            printf "] %s" "${desc}"
+        else
+            printf "  ▸ [ ] %s" "${desc}"
+        fi
+
+        # 重置样式并换行
+        printf "\033[0m\n"
+    done
+
+    # 底部提示
+    printf "\n"
+    printf "\033[0;36m  已选中: "
+    local selected_count=0
+    for key in "${!MENU_SELECTED[@]}"; do
+        if [[ "${MENU_SELECTED[${key}]}" == "1" ]]; then
+            ((selected_count++))
+        fi
+    done
+    printf "%d 项\033[0m\n" "${selected_count}"
+}
+
+# 处理键盘输入
+handle_input() {
+    local key="$1"
+    local total=${#MENU_ITEMS[@]}
+
+    case "${key}" in
+        # 上箭头
+        A|up)
+            MENU_CURSOR=$(( (MENU_CURSOR - 1 + total) % total ))
+            ;;
+        # 下箭头
+        B|down)
+            MENU_CURSOR=$(( (MENU_CURSOR + 1) % total ))
+            ;;
+        # 空格 - 切换选中
+        " ")
+            local current_key
+            current_key=$(IFS='|' read -r key desc default <<< "${MENU_ITEMS[MENU_CURSOR]}"; echo "${key}")
+            if [[ "${MENU_SELECTED[${current_key}]:-0}" == "1" ]]; then
+                MENU_SELECTED["${current_key}"]=0
+            else
+                MENU_SELECTED["${current_key}"]=1
+            fi
+            ;;
+        # a - 全选/全不选
+        a|A)
+            local all_selected=true
+            for item in "${MENU_ITEMS[@]}"; do
+                IFS='|' read -r key desc default <<< "${item}"
+                if [[ "${MENU_SELECTED[${key}]:-0}" != "1" ]]; then
+                    all_selected=false
+                    break
+                fi
+            done
+            for item in "${MENU_ITEMS[@]}"; do
+                IFS='|' read -r key desc default <<< "${item}"
+                if ${all_selected}; then
+                    MENU_SELECTED["${key}"]=0
+                else
+                    MENU_SELECTED["${key}"]=1
+                fi
+            done
+            ;;
+        # Enter - 确认
+        "")
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# 主菜单交互
+show_interactive_menu() {
+    init_menu_selections
+
+    # 绘制初始菜单
+    printf "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"  # 预留空间
+    draw_menu
+
+    # 读取键盘输入
+    while true; do
+        # 读取单个字符
+        local key
+        IFS= read -rsn1 key
+
+        # 检测特殊键 (方向键)
+        if [[ "${key}" == $'\033' ]]; then
+            read -rsn2 key
+            case "${key}" in
+                "[A") key="A" ;;  # 上
+                "[B") key="B" ;;  # 下
+                *) continue ;;
+            esac
+        fi
+
+        # 处理输入
+        if handle_input "${key}"; then
+            break
+        fi
+
+        draw_menu
+    done
+
+    # 返回选中的项目
+    local selections=()
+    for item in "${MENU_ITEMS[@]}"; do
+        IFS='|' read -r key desc default <<< "${item}"
+        if [[ "${MENU_SELECTED[${key}]:-0}" == "1" ]]; then
+            selections+=("${key}")
+        fi
+    done
+
+    # 恢复光标
+    tput cnorm
+
+    printf "\033[0m\n"
+    echo "${selections[*]}"
 }
 
 # ============================================================================
@@ -124,13 +317,11 @@ check_network() {
     return 1
 }
 
-# 检测是否需要使用国内镜像
 should_use_mirror() {
-    # 如果网络正常，测试官方源速度
     if curl -sSf --connect-timeout 5 --max-time 10 "https://go.dev" &>/dev/null; then
-        return 1  # 不需要切换
+        return 1
     fi
-    return 0  # 需要切换
+    return 0
 }
 
 switch_apt_mirror() {
@@ -216,24 +407,20 @@ pkg_install() {
 # ============================================================================
 # 环境变量工具
 # ============================================================================
-# 追加行到文件（去重）
 append_once() {
     local file="$1" line="$2"
-    # 创建文件（如果不存在）
     touch "${file}" 2>/dev/null || true
     if ! grep -qF "${line}" "${file}" 2>/dev/null; then
         echo "${line}" >> "${file}"
     fi
 }
 
-# 确保 PATH 条目存在
 ensure_path_entry() {
     local entry="$1"
     local profile_file="$2"
     append_once "${profile_file}" "export PATH=\"${entry}:\${PATH}\""
 }
 
-# 确保配置块存在（用标记包裹）
 ensure_profile_block() {
     local file="$1" marker="$2"
     shift 2
@@ -250,12 +437,10 @@ ensure_profile_block() {
     fi
 }
 
-# 下载文件（带重试和镜像回退）
 download_file() {
     local url="$1" output="$2"
     local retries=2
 
-    # 尝试原始 URL
     for ((i=1; i<=retries; i++)); do
         if curl -fsSL --connect-timeout 10 --max-time 300 -o "${output}" "${url}"; then
             return 0
@@ -327,20 +512,17 @@ install_miniconda() {
     local install_dir="${user_home}/miniconda3"
     local installer="/tmp/miniconda.sh"
 
-    # 检查是否已安装
     if [[ -d "${install_dir}" ]]; then
         log_warn "Miniconda 已安装于 ${install_dir}，跳过"
         return 0
     fi
 
-    # 下载安装脚本
     local url="${CONDA_MIRROR}/Miniconda3-latest-Linux-${ARCH}.sh"
     if ! download_file "${url}" "${installer}"; then
         log_error "Miniconda 下载失败"
         return 1
     fi
 
-    # 静默安装
     log_info "安装 Miniconda 到 ${install_dir}..."
     if ! bash "${installer}" -b -p "${install_dir}"; then
         log_error "Miniconda 安装失败"
@@ -365,14 +547,12 @@ custom_channels:
 EOF
     chown "${REAL_USER}:${REAL_USER}" "${condarc}" 2>/dev/null || true
 
-    # 初始化 shell
     sudo -u "${REAL_USER}" "${install_dir}/bin/conda" init bash 2>/dev/null || true
 
     log_info "Miniconda 安装完成，已配置清华镜像源"
 }
 
 install_python() {
-    # 先询问是否使用 Miniconda
     echo ""
     echo "  Python 安装选项:"
     echo "    1) 系统 Python + pip（推荐）"
@@ -395,44 +575,37 @@ verify_python() {
 # ============================================================================
 # 安装函数: Node.js
 # ============================================================================
-install_nvm() {
+install_node() {
     log_step "安装 nvm + Node.js"
 
     local user_home
     user_home="$(get_user_home)"
     local nvm_dir="${user_home}/.nvm"
 
-    # 检查是否已安装
     if [[ -d "${nvm_dir}" ]]; then
         log_warn "nvm 已安装于 ${nvm_dir}"
-        # 加载 nvm
         export NVM_DIR="${nvm_dir}"
         # shellcheck source=/dev/null
         [ -s "${nvm_dir}/nvm.sh" ] && . "${nvm_dir}/nvm.sh"
         return 0
     fi
 
-    # 设置国内镜像
     export NVM_NODEJS_ORG_MIRROR="${NVM_NODE_MIRROR}"
     export NVM_DIR="${nvm_dir}"
 
-    # 下载安装脚本
     local installer="/tmp/nvm-install.sh"
     if ! download_file "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" "${installer}"; then
         log_error "nvm 安装脚本下载失败"
         return 1
     fi
 
-    # 以真实用户身份安装
     log_info "安装 nvm..."
     sudo -u "${REAL_USER}" bash "${installer}" 2>/dev/null
     rm -f "${installer}"
 
-    # 加载 nvm
     # shellcheck source=/dev/null
     [ -s "${nvm_dir}/nvm.sh" ] && . "${nvm_dir}/nvm.sh"
 
-    # 安装最新 LTS
     log_info "安装 Node.js LTS..."
     NVM_NODEJS_ORG_MIRROR="${NVM_NODE_MIRROR}" nvm install --lts 2>/dev/null || {
         log_warn "通过镜像安装失败，尝试官方源..."
@@ -441,7 +614,6 @@ install_nvm() {
     nvm use --lts 2>/dev/null || true
     nvm alias default lts/* 2>/dev/null || true
 
-    # 配置 npm 国内镜像
     if command -v npm &>/dev/null; then
         sudo -u "${REAL_USER}" npm config set registry "${NPM_MIRROR}" 2>/dev/null || true
         log_info "已配置 npm 镜像源: ${NPM_MIRROR}"
@@ -464,7 +636,6 @@ verify_node() {
 install_go() {
     log_step "安装 Go"
 
-    # 获取最新版本
     local go_version
     go_version=$(curl -sSf "https://go.dev/VERSION?m=text" 2>/dev/null | head -1)
     if [[ -z "${go_version}" ]]; then
@@ -475,7 +646,6 @@ install_go() {
     local go_tar="${go_version}.linux-${ARCH}.tar.gz"
     local install_dir="/usr/local"
 
-    # 检查是否已安装相同版本
     if [[ -f "${install_dir}/go/bin/go" ]]; then
         local installed_version
         installed_version=$("${install_dir}/go/bin/go" version 2>/dev/null | awk '{print $3}')
@@ -485,7 +655,6 @@ install_go() {
         fi
     fi
 
-    # 下载
     local url="https://go.dev/dl/${go_tar}"
     local mirror_url="${MIRROR_ALIYUN}/golang/${go_tar}"
     local output="/tmp/${go_tar}"
@@ -499,7 +668,6 @@ install_go() {
         fi
     fi
 
-    # 清理旧版本并安装
     rm -rf "${install_dir}/go"
     log_info "解压 Go 到 ${install_dir}..."
     if ! tar -C "${install_dir}" -xzf "${output}"; then
@@ -509,7 +677,6 @@ install_go() {
     fi
     rm -f "${output}"
 
-    # 配置环境变量
     local profile_file="/etc/profile.d/golang.sh"
     cat > "${profile_file}" <<'EOF'
 export GOROOT=/usr/local/go
@@ -518,7 +685,6 @@ export PATH=${GOROOT}/bin:${GOPATH}/bin:${PATH}
 EOF
     chmod 644 "${profile_file}"
 
-    # 为当前用户也配置
     local user_home
     user_home="$(get_user_home)"
     local user_profile="${user_home}/.bashrc"
@@ -527,7 +693,6 @@ EOF
     ensure_path_entry '${GOPATH}/bin' "${user_profile}"
     chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
 
-    # 配置 Go 代理
     append_once "${user_profile}" "export GOPROXY=${GO_PROXY}"
     chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
 
@@ -536,6 +701,234 @@ EOF
 
 verify_go() {
     command -v go &>/dev/null || [[ -f /usr/local/go/bin/go ]]
+}
+
+# ============================================================================
+# 安装函数: Java
+# ============================================================================
+install_java() {
+    log_step "安装 Java (OpenJDK)"
+
+    local java_version="${1:-17}"
+
+    case "${PKG_MGR}" in
+        apt)
+            pkg_install "openjdk-${java_version}-jdk" || pkg_install default-jdk
+            ;;
+        dnf|yum)
+            pkg_install "java-${java_version}-openjdk-devel" || pkg_install java-17-openjdk-devel
+            ;;
+    esac
+
+    # 配置 JAVA_HOME
+    local java_home
+    java_home=$(dirname $(dirname $(readlink -f $(command -v javac))))
+    if [[ -n "${java_home}" ]]; then
+        local profile_file="/etc/profile.d/java.sh"
+        cat > "${profile_file}" <<EOF
+export JAVA_HOME=${java_home}
+export PATH=\${JAVA_HOME}/bin:\${PATH}
+EOF
+        chmod 644 "${profile_file}"
+
+        local user_home
+        user_home="$(get_user_home)"
+        local user_profile="${user_home}/.bashrc"
+        append_once "${user_profile}" "export JAVA_HOME=${java_home}"
+        ensure_path_entry '${JAVA_HOME}/bin' "${user_profile}"
+        chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
+    fi
+
+    log_info "Java OpenJDK ${java_version} 安装完成"
+}
+
+verify_java() {
+    command -v java &>/dev/null && command -v javac &>/dev/null
+}
+
+# ============================================================================
+# 安装函数: Rust
+# ============================================================================
+install_rust() {
+    log_step "安装 Rust (通过 rustup)"
+
+    local user_home
+    user_home="$(get_user_home)"
+    local cargo_dir="${user_home}/.cargo"
+
+    # 检查是否已安装
+    if [[ -f "${cargo_dir}/bin/rustc" ]]; then
+        log_warn "Rust 已安装于 ${cargo_dir}，跳过"
+        return 0
+    fi
+
+    # 设置国内镜像
+    export RUSTUP_DIST_SERVER="${RUSTUP_MIRROR}"
+    export RUSTUP_UPDATE_ROOT="${RUSTUP_MIRROR}/rustup"
+
+    local installer="/tmp/rustup-init.sh"
+    if ! download_file "https://sh.rustup.rs" "${installer}"; then
+        log_error "Rust 安装脚本下载失败"
+        return 1
+    fi
+
+    log_info "安装 Rust..."
+    # 以真实用户身份安装，静默模式
+    sudo -u "${REAL_USER}" RUSTUP_DIST_SERVER="${RUSTUP_MIRROR}" \
+        RUSTUP_UPDATE_ROOT="${RUSTUP_MIRROR}/rustup" \
+        bash "${installer}" -y --default-toolchain stable 2>/dev/null
+    rm -f "${installer}"
+
+    # 配置 crates.io 国内镜像
+    local cargo_config="${cargo_dir}/config"
+    mkdir -p "${cargo_dir}"
+    cat > "${cargo_config}" <<EOF
+[source.crates-io]
+replace-with = 'ustc'
+
+[source.ustc]
+registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
+EOF
+    chown -R "${REAL_USER}:${REAL_USER}" "${cargo_dir}" 2>/dev/null || true
+
+    # 确保 PATH 包含 cargo
+    local user_profile="${user_home}/.bashrc"
+    ensure_path_entry '${HOME}/.cargo/bin' "${user_profile}"
+    chown "${REAL_USER}:${REAL_USER}" "${user_profile}" 2>/dev/null || true
+
+    log_info "Rust 安装完成，已配置 USTC crates.io 镜像"
+}
+
+verify_rust() {
+    local user_home
+    user_home="$(get_user_home)"
+    command -v rustc &>/dev/null || [[ -f "${user_home}/.cargo/bin/rustc" ]]
+}
+
+# ============================================================================
+# 安装函数: Docker
+# ============================================================================
+install_docker() {
+    log_step "安装 Docker"
+
+    # 检查是否已安装
+    if command -v docker &>/dev/null; then
+        log_warn "Docker 已安装，跳过"
+        return 0
+    fi
+
+    # 安装依赖
+    case "${PKG_MGR}" in
+        apt)
+            pkg_install ca-certificates curl gnupg lsb-release
+            # 添加 Docker GPG key
+            local keyring="/etc/apt/keyrings/docker.gpg"
+            mkdir -p /etc/apt/keyrings
+            if [[ ! -f "${keyring}" ]]; then
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o "${keyring}" 2>/dev/null
+                chmod a+r "${keyring}"
+            fi
+            # 添加仓库
+            local codename
+            codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://download.docker.com/linux/ubuntu ${codename} stable" \
+                > /etc/apt/sources.list.d/docker.list
+            pkg_update
+            pkg_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            ;;
+        dnf|yum)
+            pkg_install yum-utils
+            yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null || \
+            dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null
+            pkg_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            ;;
+    esac
+
+    # 启动 Docker
+    systemctl start docker 2>/dev/null || true
+    systemctl enable docker 2>/dev/null || true
+
+    # 将当前用户加入 docker 组
+    usermod -aG docker "${REAL_USER}" 2>/dev/null || true
+
+    # 配置 Docker 国内镜像
+    local daemon_json="/etc/docker/daemon.json"
+    mkdir -p /etc/docker
+    cat > "${daemon_json}" <<EOF
+{
+  "registry-mirrors": [
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com",
+    "https://mirror.ccs.tencentyun.com"
+  ]
+}
+EOF
+
+    # 重启 Docker 使配置生效
+    systemctl restart docker 2>/dev/null || true
+
+    log_info "Docker 安装完成，已配置国内镜像加速"
+    log_warn "请重新登录或运行 'newgrp docker' 以使用 docker 命令"
+}
+
+verify_docker() {
+    command -v docker &>/dev/null
+}
+
+# ============================================================================
+# 安装函数: Git
+# ============================================================================
+install_git() {
+    log_step "安装 Git"
+
+    case "${PKG_MGR}" in
+        apt)
+            pkg_install git git-lfs
+            ;;
+        dnf|yum)
+            pkg_install git git-lfs
+            ;;
+    esac
+
+    # 基础配置
+    local user_home
+    user_home="$(get_user_home)"
+    local gitconfig="${user_home}/.gitconfig"
+
+    # 只在未配置时设置
+    if [[ ! -f "${gitconfig}" ]] || ! grep -q "\[user\]" "${gitconfig}" 2>/dev/null; then
+        sudo -u "${REAL_USER}" git config --global init.defaultBranch main
+        sudo -u "${REAL_USER}" git config --global core.autocrlf input
+        sudo -u "${REAL_USER}" git config --global core.editor vim
+    fi
+
+    log_info "Git 安装完成"
+}
+
+verify_git() {
+    command -v git &>/dev/null
+}
+
+# ============================================================================
+# 安装函数: Make & CMake
+# ============================================================================
+install_make() {
+    log_step "安装 Make & CMake"
+
+    case "${PKG_MGR}" in
+        apt)
+            pkg_install make cmake autoconf automake libtool
+            ;;
+        dnf|yum)
+            pkg_install make cmake autoconf automake libtool
+            ;;
+    esac
+
+    log_info "Make & CMake 安装完成"
+}
+
+verify_make() {
+    command -v make &>/dev/null && command -v cmake &>/dev/null
 }
 
 # ============================================================================
@@ -549,7 +942,6 @@ run_language_step() {
     log_info "开始安装 ${lang}..."
 
     if "${func_name}"; then
-        # 验证安装
         if "${verify_func}"; then
             local elapsed=$(( $(date +%s) - start_time ))
             log_info "✅ ${lang} 安装成功 (${elapsed}s)"
@@ -568,58 +960,11 @@ run_language_step() {
 }
 
 # ============================================================================
-# 交互菜单
-# ============================================================================
-show_menu() {
-    echo ""
-    echo "╔══════════════════════════════════════════════╗"
-    echo "║     Linux 开发语言自动安装工具              ║"
-    echo "╠══════════════════════════════════════════════╣"
-    echo "║  可安装的语言:                              ║"
-    echo "║    1) C/C++ (gcc, g++, make, cmake)        ║"
-    echo "║    2) Python (系统版本 或 Miniconda)        ║"
-    echo "║    3) Node.js (通过 nvm)                    ║"
-    echo "║    4) Go                                    ║"
-    echo "║                                              ║"
-    echo "║  特殊选项:                                  ║"
-    echo "║    a) 全部安装                               ║"
-    echo "║    q) 退出                                   ║"
-    echo "╚══════════════════════════════════════════════╝"
-    echo ""
-}
-
-parse_selection() {
-    local input="$1"
-    local selections=()
-
-    # 全部安装
-    if [[ "${input}" == "a" || "${input}" == "A" ]]; then
-        echo "cpp python node go"
-        return
-    fi
-
-    # 解析数字选择
-    for char in $(echo "${input}" | grep -o .); do
-        case "${char}" in
-            1) selections+=("cpp") ;;
-            2) selections+=("python") ;;
-            3) selections+=("node") ;;
-            4) selections+=("go") ;;
-            q|Q) echo "quit"; return ;;
-            *) ;; # 忽略无效输入
-        esac
-    done
-
-    # 去重
-    printf '%s\n' "${selections[@]}" | sort -u | tr '\n' ' '
-}
-
-# ============================================================================
 # 主流程
 # ============================================================================
 main() {
     echo ""
-    log_info "Linux 开发语言自动安装工具 v1.0"
+    log_info "Linux 开发语言自动安装工具 v2.0"
     echo ""
 
     # 系统检测
@@ -638,7 +983,6 @@ main() {
         exit 1
     fi
 
-    # 包管理器检测
     if [[ "${PKG_MGR}" == "unknown" ]]; then
         log_error "不支持的 Linux 发行版: ${OS_ID}"
         log_error "支持: Ubuntu, Debian, CentOS, RHEL, Rocky, AlmaLinux"
@@ -661,25 +1005,18 @@ main() {
     log_info "更新包索引..."
     pkg_update 2>/dev/null || log_warn "包索引更新失败，继续执行..."
 
-    # 显示菜单并获取选择
-    show_menu
-    read -rp "请输入选项 (如 1,3 或 a 全部安装): " user_input
+    # 交互式菜单
     local selections
-    selections=$(parse_selection "${user_input}")
-
-    if [[ "${selections}" == "quit" ]]; then
-        log_info "用户取消，退出"
-        exit 0
-    fi
+    selections=$(show_interactive_menu)
 
     if [[ -z "${selections}" ]]; then
-        log_error "未选择任何语言，退出"
+        log_error "未选择任何项目，退出"
         exit 1
     fi
 
     # 确认安装
     echo ""
-    log_info "将安装以下语言: ${selections}"
+    log_info "将安装: ${selections}"
     read -rp "确认继续? [Y/n]: " confirm
     if [[ "${confirm}" =~ ^[nN] ]]; then
         log_info "用户取消，退出"
@@ -717,7 +1054,7 @@ main() {
                 fi
                 ;;
             node)
-                if run_language_step "Node.js" install_nvm verify_node; then
+                if run_language_step "Node.js" install_node verify_node; then
                     ((success++))
                 else
                     ((failed++))
@@ -732,6 +1069,46 @@ main() {
                     failed_list+=("Go")
                 fi
                 ;;
+            java)
+                if run_language_step "Java" install_java verify_java; then
+                    ((success++))
+                else
+                    ((failed++))
+                    failed_list+=("Java")
+                fi
+                ;;
+            rust)
+                if run_language_step "Rust" install_rust verify_rust; then
+                    ((success++))
+                else
+                    ((failed++))
+                    failed_list+=("Rust")
+                fi
+                ;;
+            docker)
+                if run_language_step "Docker" install_docker verify_docker; then
+                    ((success++))
+                else
+                    ((failed++))
+                    failed_list+=("Docker")
+                fi
+                ;;
+            git)
+                if run_language_step "Git" install_git verify_git; then
+                    ((success++))
+                else
+                    ((failed++))
+                    failed_list+=("Git")
+                fi
+                ;;
+            make)
+                if run_language_step "Make & CMake" install_make verify_make; then
+                    ((success++))
+                else
+                    ((failed++))
+                    failed_list+=("Make & CMake")
+                fi
+                ;;
         esac
     done
 
@@ -741,7 +1118,7 @@ main() {
     log_info "总计: ${total}  成功: ${success}  失败: ${failed}"
 
     if [[ ${failed} -gt 0 ]]; then
-        log_warn "失败的语言: ${failed_list[*]}"
+        log_warn "失败的项目: ${failed_list[*]}"
         log_warn "详细错误请查看: ${ERROR_LOG}"
     fi
 
